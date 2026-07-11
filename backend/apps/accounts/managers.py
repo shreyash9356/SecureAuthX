@@ -6,12 +6,16 @@ class UserManager(BaseUserManager):
     Custom manager for the User model.
     """
 
-    def create_user(self, email, password=None, **extra_fields):
+    def create_user(self, email: str, password: str | None = None, **extra_fields):
         """
         Create and save a regular user.
         """
+
         if not email:
             raise ValueError("The Email field must be set.")
+
+        if not password:
+            raise ValueError("The Password field must be set.")
 
         email = self.normalize_email(email)
 
@@ -25,7 +29,12 @@ class UserManager(BaseUserManager):
 
         return user
 
-    def create_superuser(self, email, password=None, **extra_fields):
+    def create_superuser(
+        self,
+        email: str,
+        password: str | None = None,
+        **extra_fields,
+    ):
         """
         Create and save a superuser.
         """
@@ -33,6 +42,8 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("is_active", True)
+        extra_fields.setdefault("is_verified", True)
+        extra_fields.setdefault("is_locked", False)
 
         if extra_fields.get("is_staff") is not True:
             raise ValueError("Superuser must have is_staff=True.")
@@ -40,4 +51,11 @@ class UserManager(BaseUserManager):
         if extra_fields.get("is_superuser") is not True:
             raise ValueError("Superuser must have is_superuser=True.")
 
-        return self.create_user(email, password, **extra_fields)
+        if extra_fields.get("is_verified") is not True:
+            raise ValueError("Superuser must have is_verified=True.")
+
+        return self.create_user(
+            email=email,
+            password=password,
+            **extra_fields,
+        )

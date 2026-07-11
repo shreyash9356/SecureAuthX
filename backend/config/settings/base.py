@@ -1,5 +1,5 @@
 from pathlib import Path
-
+from datetime import timedelta
 from decouple import config
 
 # ------------------------------------------------------------------------------
@@ -41,6 +41,9 @@ DJANGO_APPS = [
 
 THIRD_PARTY_APPS = [
     "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
+    "drf_spectacular",
+    "django_filters",
     "corsheaders",
 ]
 
@@ -107,6 +110,21 @@ TEMPLATES = [
 ]
 
 # ------------------------------------------------------------------------------
+# SIMPLE_JWT
+# ------------------------------------------------------------------------------
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "UPDATE_LAST_LOGIN": True,
+    "ALGORITHM": "HS256",
+    "SIGNING_KEY": SECRET_KEY,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
+}
+# ------------------------------------------------------------------------------
 # WSGI
 # ------------------------------------------------------------------------------
 
@@ -127,10 +145,33 @@ DATABASES = {
     }
 }
 
+
+# ------------------------------------------------------------------------------
+# PASSWORD_HASHERS
+# -------------------------------------------------------------------------------
+
+
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+    "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
+]
+
+
+# ------------------------------------------------------------------------------
+# Email Backend
+# -------------------------------------------------------------------------------
+
+
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+DEFAULT_FROM_EMAIL = "noreply@secureauthx.local"
+
+
 # ------------------------------------------------------------------------------
 # AUTH_USER_MODEL
 # ------------------------------------------------------------------------------
-
 
 AUTH_USER_MODEL = "accounts.User"
 
@@ -190,16 +231,98 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # ------------------------------------------------------------------------------
 
 REST_FRAMEWORK = {
-    "DEFAULT_PERMISSION_CLASSES": [
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
+    "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
-    ],
-    "DEFAULT_AUTHENTICATION_CLASSES": [],
+    ),
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+
+    "EXCEPTION_HANDLER": "apps.common.exceptions.custom_exception_handler",
+
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
 }
-
 # ------------------------------------------------------------------------------
 # CORS
 # ------------------------------------------------------------------------------
 
 CORS_ALLOW_ALL_ORIGINS = True
+
+
+
+
+# ------------------------------------------------------------------------------
+# Swagger / drf-spectacular
+# ------------------------------------------------------------------------------
+
+SPECTACULAR_SETTINGS = {
+    # ── Metadata ──────────────────────────────────────────────────────────────
+    "TITLE": "SecureAuthX API",
+    "DESCRIPTION": (
+        "## Overview\n\n"
+        "SecureAuthX is an **enterprise-grade Identity and Access Management (IAM)** "
+        "platform built with Django REST Framework and React.\n\n"
+        "The API provides secure authentication, authorization, user management, "
+        "role-based access control (RBAC), multi-factor authentication (MFA), "
+        "audit logging, and session management.\n\n"
+        "## Authentication\n\n"
+        "Most endpoints require a valid **JWT Bearer token**. "
+        "Obtain tokens via `POST /api/v1/auth/login/` and include the access token "
+        "in the `Authorization` header:\n\n"
+        "```\nAuthorization: Bearer <access_token>\n```\n\n"
+        "Access tokens expire after **15 minutes**. "
+        "Use `POST /api/v1/auth/token/refresh/` to obtain a new access token "
+        "using your refresh token.\n\n"
+        "## Standards\n\n"
+        "- OWASP Top 10\n"
+        "- OWASP ASVS Level 2\n"
+        "- NIST SP 800-63B\n"
+    ),
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+
+    # ── Contact & License ─────────────────────────────────────────────────────
+    "CONTACT": {
+        "name": "SecureAuthX Team",
+        "email": "support@secureauthx.local",
+    },
+    "LICENSE": {
+        "name": "MIT",
+    },
+
+    # ── JWT Bearer Security Scheme ────────────────────────────────────────────
+    "SECURITY": [
+        {
+            "BearerAuth": [],
+        }
+    ],
+    "SECURITY_DEFINITIONS": {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": (
+                "JWT Bearer token authentication. "
+                "Obtain a token via POST /api/v1/auth/login/ "
+                "and prefix the value with 'Bearer '."
+            ),
+        }
+    },
+
+    # ── Schema Generation ─────────────────────────────────────────────────────
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SORT_OPERATIONS": False,
+
+    # ── Tags ordering ─────────────────────────────────────────────────────────
+    "TAGS": [
+        {
+            "name": "Authentication",
+            "description": (
+                "Endpoints for registration, login, logout, "
+                "email verification, and password management."
+            ),
+        },
+    ],
+}
