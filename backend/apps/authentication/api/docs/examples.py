@@ -7,6 +7,7 @@ them easy to update without touching business logic.
 """
 
 from drf_spectacular.utils import OpenApiExample
+
 # ==============================================================================
 # Registration Examples
 # ==============================================================================
@@ -166,11 +167,11 @@ LOGIN_SUCCESS_EXAMPLE = OpenApiExample(
         "message": "Login successful.",
         "data": {
             "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
-                      ".eyJ1c2VyX2lkIjoiYTFiMmMzZDQtZTVmNi03ODkwLWFiY2QtZWYxMjM0NTY3ODkwIiwiZXhwIjoxNzUyMDAwMDAwfQ"
-                      ".SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
+            ".eyJ1c2VyX2lkIjoiYTFiMmMzZDQtZTVmNi03ODkwLWFiY2QtZWYxMjM0NTY3ODkwIiwiZXhwIjoxNzUyMDAwMDAwfQ"
+            ".SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
             "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
-                       ".eyJ1c2VyX2lkIjoiYTFiMmMzZDQtZTVmNi03ODkwLWFiY2QtZWYxMjM0NTY3ODkwIiwidG9rZW5fdHlwZSI6InJlZnJlc2gifQ"
-                       ".dGVzdC1yZWZyZXNoLXRva2Vu",
+            ".eyJ1c2VyX2lkIjoiYTFiMmMzZDQtZTVmNi03ODkwLWFiY2QtZWYxMjM0NTY3ODkwIiwidG9rZW5fdHlwZSI6InJlZnJlc2gifQ"
+            ".dGVzdC1yZWZyZXNoLXRva2Vu",
             "user": {
                 "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
                 "email": "john.doe@example.com",
@@ -286,7 +287,6 @@ LOGIN_SERVER_ERROR_EXAMPLE = OpenApiExample(
 )
 
 
-
 # ==============================================================================
 # REFRESH Examples
 # ==============================================================================
@@ -294,9 +294,7 @@ LOGIN_SERVER_ERROR_EXAMPLE = OpenApiExample(
 
 REFRESH_TOKEN_REQUEST_EXAMPLE = OpenApiExample(
     "Refresh access token",
-    value={
-        "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-    },
+    value={"refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."},
     request_only=True,
 )
 
@@ -305,9 +303,7 @@ REFRESH_TOKEN_SUCCESS_EXAMPLE = OpenApiExample(
     value={
         "success": True,
         "message": "Access token refreshed successfully.",
-        "data": {
-            "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-        },
+        "data": {"access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."},
     },
     response_only=True,
     status_codes=["200"],
@@ -331,19 +327,13 @@ REFRESH_TOKEN_INVALID_EXAMPLE = OpenApiExample(
 
 LOGOUT_REQUEST_EXAMPLE = OpenApiExample(
     "Logout request",
-    value={
-        "refresh": "eyJhbGciOiJIUzI1NiIs..."
-    },
+    value={"refresh": "eyJhbGciOiJIUzI1NiIs..."},
     request_only=True,
 )
 
 LOGOUT_SUCCESS_EXAMPLE = OpenApiExample(
     "Logout successful",
-    value={
-        "success": True,
-        "message": "Logout successful.",
-        "data": {}
-    },
+    value={"success": True, "message": "Logout successful.", "data": {}},
     response_only=True,
     status_codes=["200"],
 )
@@ -353,7 +343,7 @@ LOGOUT_INVALID_TOKEN_EXAMPLE = OpenApiExample(
     value={
         "success": False,
         "message": "Refresh token is invalid or expired.",
-        "errors": {}
+        "errors": {},
     },
     response_only=True,
     status_codes=["401"],
@@ -366,9 +356,7 @@ LOGOUT_INVALID_TOKEN_EXAMPLE = OpenApiExample(
 
 RESEND_VERIFICATION_REQUEST_EXAMPLE = OpenApiExample(
     "Resend verification email",
-    value={
-        "email": "john@example.com"
-    },
+    value={"email": "john@example.com"},
     request_only=True,
 )
 
@@ -377,7 +365,7 @@ RESEND_VERIFICATION_SUCCESS_EXAMPLE = OpenApiExample(
     value={
         "success": True,
         "message": "If the email exists and is not verified, a verification email has been sent.",
-        "data": {}
+        "data": {},
     },
     response_only=True,
     status_codes=["200"],
@@ -406,9 +394,7 @@ FORGOT_PASSWORD_REQUEST_EXAMPLE = OpenApiExample(
 FORGOT_PASSWORD_SUCCESS_EXAMPLE = OpenApiExample(
     name="Forgot Password — Success",
     summary="Generic success — reset link dispatched (or silently skipped)",
-    description=(
-        "Returned in all cases to prevent leaking whether the email exists."
-    ),
+    description=("Returned in all cases to prevent leaking whether the email exists."),
     value={
         "success": True,
         "message": "If an account exists, a password reset link has been sent.",
@@ -656,4 +642,125 @@ CHANGE_PASSWORD_SERVER_ERROR_EXAMPLE = OpenApiExample(
     },
     response_only=True,
     status_codes=["500"],
+)
+
+
+# ==============================================================================
+# Verify Email Examples
+# ==============================================================================
+
+VERIFY_EMAIL_SUCCESS_EXAMPLE = OpenApiExample(
+    name="Verify Email — Success",
+    summary="Email verified successfully",
+    description=(
+        "Returned when the signed verification token is valid and "
+        "the account is now active."
+    ),
+    value={
+        "success": True,
+        "message": "Email verified successfully.",
+        "data": {},
+    },
+    response_only=True,
+    status_codes=["200"],
+)
+
+VERIFY_EMAIL_MISSING_TOKEN_EXAMPLE = OpenApiExample(
+    name="Verify Email — Missing Token",
+    summary="No token query parameter supplied",
+    description=(
+        "Returned when the ``token`` query parameter is absent from the request."
+    ),
+    value={
+        "success": False,
+        "message": "Verification token is required.",
+        "errors": {},
+    },
+    response_only=True,
+    status_codes=["400"],
+)
+
+VERIFY_EMAIL_INVALID_TOKEN_EXAMPLE = OpenApiExample(
+    name="Verify Email — Invalid or Expired Token",
+    summary="Token is tampered with or has exceeded the 24-hour validity window",
+    description=(
+        "Returned when the signed token cannot be verified or has expired. "
+        "The user must request a new verification email."
+    ),
+    value={
+        "success": False,
+        "message": "Verification link is invalid or has expired.",
+        "errors": {},
+    },
+    response_only=True,
+    status_codes=["400"],
+)
+
+
+# ==============================================================================
+# Resend Verification — Validation Error Example (previously missing)
+# ==============================================================================
+
+RESEND_VERIFICATION_VALIDATION_ERROR_EXAMPLE = OpenApiExample(
+    name="Resend Verification — Validation Error",
+    summary="Invalid email format",
+    description="Returned when the submitted email fails format validation.",
+    value={
+        "success": False,
+        "message": "Request validation failed.",
+        "errors": {
+            "email": ["Enter a valid email address."],
+        },
+    },
+    response_only=True,
+    status_codes=["400"],
+)
+
+
+# ==============================================================================
+# Me (Profile) Examples
+# ==============================================================================
+
+ME_SUCCESS_EXAMPLE = OpenApiExample(
+    name="Me — Success",
+    summary="Authenticated user profile retrieved",
+    description=(
+        "Returned when a valid JWT access token is supplied. "
+        "Contains the full profile of the authenticated user."
+    ),
+    value={
+        "success": True,
+        "message": "Profile retrieved successfully.",
+        "data": {
+            "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "email": "john.doe@example.com",
+            "username": "johndoe",
+            "first_name": "John",
+            "last_name": "Doe",
+            "full_name": "John Doe",
+            "is_verified": True,
+            "is_active": True,
+            "created_at": "2025-01-15T10:30:00Z",
+        },
+    },
+    response_only=True,
+    status_codes=["200"],
+)
+
+ME_UNAUTHENTICATED_EXAMPLE = OpenApiExample(
+    name="Me — Unauthenticated",
+    summary="No valid JWT token provided",
+    description=(
+        "Returned when the ``Authorization`` header is missing or "
+        "contains an invalid/expired access token."
+    ),
+    value={
+        "success": False,
+        "message": "Authentication credentials were not provided.",
+        "errors": {
+            "detail": "Authentication credentials were not provided.",
+        },
+    },
+    response_only=True,
+    status_codes=["401"],
 )

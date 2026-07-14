@@ -158,15 +158,21 @@ PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
 ]
 
+# ==============================================================================
+# Email Configuration
+# ==============================================================================
 
-# ------------------------------------------------------------------------------
-# Email Backend
-# -------------------------------------------------------------------------------
+EMAIL_BACKEND = config("EMAIL_BACKEND")
 
+EMAIL_HOST = config("EMAIL_HOST")
+EMAIL_PORT = config("EMAIL_PORT", cast=int)
 
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", cast=bool)
 
-DEFAULT_FROM_EMAIL = "noreply@secureauthx.local"
+EMAIL_HOST_USER = config("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")
+
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL")
 
 
 # ------------------------------------------------------------------------------
@@ -234,13 +240,9 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
-    "DEFAULT_PERMISSION_CLASSES": (
-        "rest_framework.permissions.IsAuthenticated",
-    ),
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-
     "EXCEPTION_HANDLER": "apps.common.exceptions.custom_exception_handler",
-
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
 }
@@ -249,8 +251,6 @@ REST_FRAMEWORK = {
 # ------------------------------------------------------------------------------
 
 CORS_ALLOW_ALL_ORIGINS = True
-
-
 
 
 # ------------------------------------------------------------------------------
@@ -282,7 +282,6 @@ SPECTACULAR_SETTINGS = {
     ),
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
-
     # ── Contact & License ─────────────────────────────────────────────────────
     "CONTACT": {
         "name": "SecureAuthX Team",
@@ -291,7 +290,6 @@ SPECTACULAR_SETTINGS = {
     "LICENSE": {
         "name": "MIT",
     },
-
     # ── JWT Bearer Security Scheme ────────────────────────────────────────────
     "SECURITY": [
         {
@@ -310,18 +308,30 @@ SPECTACULAR_SETTINGS = {
             ),
         }
     },
-
     # ── Schema Generation ─────────────────────────────────────────────────────
     "COMPONENT_SPLIT_REQUEST": True,
     "SORT_OPERATIONS": False,
-
     # ── Tags ordering ─────────────────────────────────────────────────────────
     "TAGS": [
         {
             "name": "Authentication",
             "description": (
                 "Endpoints for registration, login, logout, "
-                "email verification, and password management."
+                "email verification, and token management."
+            ),
+        },
+        {
+            "name": "Password Management",
+            "description": (
+                "Endpoints for forgot password, password reset via token, "
+                "and changing password for authenticated users."
+            ),
+        },
+        {
+            "name": "Audit Logs",
+            "description": (
+                "Read-only audit trail of all security and domain events. "
+                "Accessible by staff (admin) users only."
             ),
         },
     ],

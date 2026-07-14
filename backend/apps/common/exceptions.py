@@ -34,6 +34,7 @@ from rest_framework.response import Response
 from rest_framework.views import exception_handler
 
 from apps.authentication.exceptions import AuthenticationException
+from apps.audit_logs.exceptions import AuditLogException, AuditLogNotFoundException
 
 
 # ==============================================================================
@@ -257,12 +258,15 @@ def _handle_auth_exception(exc: AuthenticationException) -> Response:
         http_status = status.HTTP_409_CONFLICT
 
     # Input/policy failures — 400
-    elif isinstance(exc, (
-        WeakPasswordException,
-        PasswordMismatchException,
-        InvalidVerificationTokenException,
-        InvalidPasswordResetTokenException,
-    )):
+    elif isinstance(
+        exc,
+        (
+            WeakPasswordException,
+            PasswordMismatchException,
+            InvalidVerificationTokenException,
+            InvalidPasswordResetTokenException,
+        ),
+    ):
         http_status = status.HTTP_400_BAD_REQUEST
 
     # Base class / any future subclass not explicitly mapped
@@ -315,6 +319,21 @@ def custom_exception_handler(exc, context) -> Response | None:
     # ── Custom domain exceptions ──────────────────────────────────────────────
     if isinstance(exc, AuthenticationException):
         return _handle_auth_exception(exc)
+
+    # ── Audit log domain exceptions ───────────────────────────────────────────
+    if isinstance(exc, AuditLogNotFoundException):
+        return _error_response(
+            message=exc.message,
+            errors={},
+            http_status=status.HTTP_404_NOT_FOUND,
+        )
+
+    if isinstance(exc, AuditLogException):
+        return _error_response(
+            message=exc.message,
+            errors={},
+            http_status=status.HTTP_400_BAD_REQUEST,
+        )
 
     # ── Unknown / unhandled exceptions ────────────────────────────────────────
     if settings.DEBUG:

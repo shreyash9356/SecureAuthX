@@ -31,7 +31,6 @@ urlpatterns = [
         MeAPIView.as_view(),
         name="me",
     ),
-
     # ── Session management ────────────────────────────────────────────────────
     path(
         "login/",
@@ -48,7 +47,6 @@ urlpatterns = [
         RefreshTokenAPIView.as_view(),
         name="token_refresh",
     ),
-
     # ── Email verification ────────────────────────────────────────────────────
     path(
         "verify-email/",
@@ -60,7 +58,6 @@ urlpatterns = [
         ResendVerificationAPIView.as_view(),
         name="resend_verification",
     ),
-
     # ── Password management ───────────────────────────────────────────────────
     path(
         "forgot-password/",

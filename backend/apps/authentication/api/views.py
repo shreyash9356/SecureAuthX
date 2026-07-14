@@ -2,11 +2,11 @@
 API views for the SecureAuthX authentication module.
 
 Each view is intentionally thin:
-- Deserialise the request
-- Call the serializer (which delegates to a service)
+- Deserialise the request (always injecting ``request`` into context)
+- Call serializer.save() which delegates to the service
 - Return a standardised response
 
-Business logic lives exclusively in the service layer.
+Business logic and audit logging live exclusively in the service layer.
 """
 
 from rest_framework import status
@@ -16,10 +16,10 @@ from rest_framework.views import APIView
 
 from apps.authentication.api.docs.schemas import (
     change_password_schema,
-    extend_schema,
     forgot_password_schema,
     login_schema,
     logout_schema,
+    me_schema,
     refresh_token_schema,
     registration_schema,
     resend_verification_schema,
@@ -49,9 +49,7 @@ from apps.authentication.constants import (
     RESEND_VERIFICATION_SUCCESS,
     TOKEN_REFRESH_SUCCESS,
 )
-from apps.authentication.services.email_verification import (
-    EmailVerificationService,
-)
+from apps.authentication.services.email_verification import EmailVerificationService
 from apps.authentication.services.profile import ProfileService
 from apps.authentication.utils import success_response
 
@@ -63,21 +61,16 @@ from apps.authentication.utils import success_response
 
 @registration_schema
 class RegistrationAPIView(APIView):
-    """
-    API endpoint for user registration.
-    """
+    """API endpoint for user registration."""
 
     permission_classes = [AllowAny]
 
     def post(self, request):
-        """
-        Register a new user.
-        """
-
-        serializer = RegistrationSerializer(data=request.data)
-
+        serializer = RegistrationSerializer(
+            data=request.data,
+            context={"request": request},
+        )
         serializer.is_valid(raise_exception=True)
-
         result = serializer.save()
 
         return Response(
@@ -99,21 +92,16 @@ class RegistrationAPIView(APIView):
 
 @login_schema
 class LoginAPIView(APIView):
-    """
-    API endpoint for user authentication.
-    """
+    """API endpoint for user authentication."""
 
     permission_classes = [AllowAny]
 
     def post(self, request):
-        """
-        Authenticate a user.
-        """
-
-        serializer = LoginSerializer(data=request.data)
-
+        serializer = LoginSerializer(
+            data=request.data,
+            context={"request": request},
+        )
         serializer.is_valid(raise_exception=True)
-
         result = serializer.save()
 
         return Response(
@@ -139,20 +127,14 @@ class LoginAPIView(APIView):
 # ==============================================================================
 
 
+@me_schema
 class MeAPIView(APIView):
-    """
-    API endpoint for retrieving the authenticated user's profile.
-    """
+    """API endpoint for retrieving the authenticated user's profile."""
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        """
-        Return the authenticated user's profile.
-        """
-
         user = ProfileService.get_profile(request.user)
-
         serializer = MeSerializer(user)
 
         return Response(
@@ -171,28 +153,20 @@ class MeAPIView(APIView):
 
 @refresh_token_schema
 class RefreshTokenAPIView(APIView):
-    """
-    API endpoint for refreshing JWT access tokens.
-    """
+    """API endpoint for refreshing JWT access tokens."""
 
     permission_classes = [AllowAny]
 
     def post(self, request):
-        """
-        Refresh the JWT access token.
-        """
-
-        serializer = RefreshTokenSerializer(data=request.data)
-
+        serializer = RefreshTokenSerializer(
+            data=request.data,
+            context={"request": request},
+        )
         serializer.is_valid(raise_exception=True)
-
         result = serializer.save()
 
         return Response(
-            success_response(
-                message=TOKEN_REFRESH_SUCCESS,
-                data=result,
-            ),
+            success_response(message=TOKEN_REFRESH_SUCCESS, data=result),
             status=status.HTTP_200_OK,
         )
 
@@ -204,28 +178,20 @@ class RefreshTokenAPIView(APIView):
 
 @logout_schema
 class LogoutAPIView(APIView):
-    """
-    API endpoint for logging out a user.
-    """
+    """API endpoint for logging out a user."""
 
     permission_classes = [AllowAny]
 
     def post(self, request):
-        """
-        Blacklist the supplied refresh token.
-        """
-
-        serializer = LogoutSerializer(data=request.data)
-
+        serializer = LogoutSerializer(
+            data=request.data,
+            context={"request": request},
+        )
         serializer.is_valid(raise_exception=True)
-
         serializer.save()
 
         return Response(
-            success_response(
-                message=LOGOUT_SUCCESS,
-                data={},
-            ),
+            success_response(message=LOGOUT_SUCCESS, data={}),
             status=status.HTTP_200_OK,
         )
 
@@ -237,36 +203,23 @@ class LogoutAPIView(APIView):
 
 @verify_email_schema
 class VerifyEmailAPIView(APIView):
-    """
-    API endpoint for verifying a user's email address.
-    """
+    """API endpoint for verifying a user's email address."""
 
     permission_classes = [AllowAny]
 
     def get(self, request):
-        """
-        Verify a user's email using the verification token.
-        """
-
         token = request.query_params.get("token")
 
         if not token:
             return Response(
-                {
-                    "success": False,
-                    "message": "Verification token is required.",
-                    "errors": {},
-                },
+                {"success": False, "message": "Verification token is required.", "errors": {}},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        EmailVerificationService.verify(token=token)
+        EmailVerificationService.verify(token=token, request=request)
 
         return Response(
-            success_response(
-                message=EMAIL_VERIFICATION_SUCCESS,
-                data={},
-            ),
+            success_response(message=EMAIL_VERIFICATION_SUCCESS, data={}),
             status=status.HTTP_200_OK,
         )
 
@@ -278,28 +231,20 @@ class VerifyEmailAPIView(APIView):
 
 @resend_verification_schema
 class ResendVerificationAPIView(APIView):
-    """
-    API endpoint for resending verification emails.
-    """
+    """API endpoint for resending verification emails."""
 
     permission_classes = [AllowAny]
 
     def post(self, request):
-        """
-        Resend verification email.
-        """
-
-        serializer = ResendVerificationSerializer(data=request.data)
-
+        serializer = ResendVerificationSerializer(
+            data=request.data,
+            context={"request": request},
+        )
         serializer.is_valid(raise_exception=True)
-
         serializer.save()
 
         return Response(
-            success_response(
-                message=RESEND_VERIFICATION_SUCCESS,
-                data={},
-            ),
+            success_response(message=RESEND_VERIFICATION_SUCCESS, data={}),
             status=status.HTTP_200_OK,
         )
 
@@ -311,28 +256,20 @@ class ResendVerificationAPIView(APIView):
 
 @forgot_password_schema
 class ForgotPasswordAPIView(APIView):
-    """
-    API endpoint for requesting a password reset link.
-    """
+    """API endpoint for requesting a password reset link."""
 
     permission_classes = [AllowAny]
 
     def post(self, request):
-        """
-        Generate a password reset token and send a reset email.
-        """
-
-        serializer = ForgotPasswordSerializer(data=request.data)
-
+        serializer = ForgotPasswordSerializer(
+            data=request.data,
+            context={"request": request},
+        )
         serializer.is_valid(raise_exception=True)
-
         serializer.save()
 
         return Response(
-            success_response(
-                message=PASSWORD_RESET_EMAIL_SENT,
-                data={},
-            ),
+            success_response(message=PASSWORD_RESET_EMAIL_SENT, data={}),
             status=status.HTTP_200_OK,
         )
 
@@ -344,28 +281,20 @@ class ForgotPasswordAPIView(APIView):
 
 @reset_password_schema
 class ResetPasswordAPIView(APIView):
-    """
-    API endpoint for resetting a password via a signed token.
-    """
+    """API endpoint for resetting a password via a signed token."""
 
     permission_classes = [AllowAny]
 
     def post(self, request):
-        """
-        Reset the user's password using the signed token from the email.
-        """
-
-        serializer = ResetPasswordSerializer(data=request.data)
-
+        serializer = ResetPasswordSerializer(
+            data=request.data,
+            context={"request": request},
+        )
         serializer.is_valid(raise_exception=True)
-
         serializer.save()
 
         return Response(
-            success_response(
-                message=PASSWORD_RESET_SUCCESS,
-                data={},
-            ),
+            success_response(message=PASSWORD_RESET_SUCCESS, data={}),
             status=status.HTTP_200_OK,
         )
 
@@ -377,30 +306,19 @@ class ResetPasswordAPIView(APIView):
 
 @change_password_schema
 class ChangePasswordAPIView(APIView):
-    """
-    API endpoint for changing the authenticated user's password.
-    """
+    """API endpoint for changing the authenticated user's password."""
 
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        """
-        Change the authenticated user's password.
-        """
-
         serializer = ChangePasswordSerializer(
             data=request.data,
             context={"request": request},
         )
-
         serializer.is_valid(raise_exception=True)
-
         serializer.save()
 
         return Response(
-            success_response(
-                message=PASSWORD_CHANGED_SUCCESS,
-                data={},
-            ),
+            success_response(message=PASSWORD_CHANGED_SUCCESS, data={}),
             status=status.HTTP_200_OK,
         )

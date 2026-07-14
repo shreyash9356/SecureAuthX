@@ -185,6 +185,7 @@ class LoginErrorResponseSerializer(serializers.Serializer):
         help_text="Empty for authentication failures; reserved for future use.",
     )
 
+
 # ==============================================================================
 # Refresh Token Serializers
 # ==============================================================================
@@ -195,9 +196,7 @@ class RefreshTokenRequestSerializer(serializers.Serializer):
     Request body for refreshing a JWT access token.
     """
 
-    refresh = serializers.CharField(
-        help_text="Valid JWT refresh token."
-    )
+    refresh = serializers.CharField(help_text="Valid JWT refresh token.")
 
 
 class RefreshTokenDataSerializer(serializers.Serializer):
@@ -205,9 +204,7 @@ class RefreshTokenDataSerializer(serializers.Serializer):
     Data returned after a successful refresh.
     """
 
-    access = serializers.CharField(
-        help_text="Newly issued JWT access token."
-    )
+    access = serializers.CharField(help_text="Newly issued JWT access token.")
 
 
 class RefreshTokenSuccessResponseSerializer(serializers.Serializer):
@@ -216,9 +213,7 @@ class RefreshTokenSuccessResponseSerializer(serializers.Serializer):
     """
 
     success = serializers.BooleanField(default=True)
-    message = serializers.CharField(
-        default="Access token refreshed successfully."
-    )
+    message = serializers.CharField(default="Access token refreshed successfully.")
     data = RefreshTokenDataSerializer()
 
 
@@ -230,6 +225,7 @@ class RefreshTokenErrorResponseSerializer(serializers.Serializer):
     success = serializers.BooleanField(default=False)
     message = serializers.CharField()
     errors = serializers.DictField(default={})
+
 
 # ==============================================================================
 # Logout Serializers
@@ -253,14 +249,9 @@ class LogoutSuccessResponseSerializer(serializers.Serializer):
 
     success = serializers.BooleanField(default=True)
 
-    message = serializers.CharField(
-        default="Logout successful."
-    )
+    message = serializers.CharField(default="Logout successful.")
 
-    data = serializers.DictField(
-        default={},
-        help_text="Always an empty object."
-    )
+    data = serializers.DictField(default={}, help_text="Always an empty object.")
 
 
 class LogoutErrorResponseSerializer(serializers.Serializer):
@@ -278,7 +269,6 @@ class LogoutErrorResponseSerializer(serializers.Serializer):
 # ==============================================================================
 # Resendverification Serializers
 # ==============================================================================
-
 
 
 class ResendVerificationRequestSerializer(serializers.Serializer):
@@ -476,4 +466,126 @@ class ChangePasswordErrorResponseSerializer(serializers.Serializer):
         child=serializers.ListField(child=serializers.CharField()),
         default={},
         help_text="Field-level validation errors.",
+    )
+
+
+# ==============================================================================
+# Me (Profile) Serializers
+# ==============================================================================
+
+
+class MeUserDataSerializer(serializers.Serializer):
+    """
+    The ``data`` payload returned by ``GET /api/v1/auth/me/``.
+    """
+
+    id = serializers.UUIDField(
+        help_text="Unique identifier of the user.",
+    )
+    email = serializers.EmailField(
+        help_text="Email address of the user.",
+    )
+    username = serializers.CharField(
+        allow_null=True,
+        help_text="Optional username.",
+    )
+    first_name = serializers.CharField(
+        help_text="Given name.",
+    )
+    last_name = serializers.CharField(
+        help_text="Family name.",
+    )
+    full_name = serializers.CharField(
+        help_text="Computed full name (first + last).",
+    )
+    is_verified = serializers.BooleanField(
+        help_text="Whether the email address has been verified.",
+    )
+    is_active = serializers.BooleanField(
+        help_text="Whether the account is active.",
+    )
+    created_at = serializers.DateTimeField(
+        help_text="Account creation timestamp (ISO 8601).",
+    )
+
+
+class MeSuccessResponseSerializer(serializers.Serializer):
+    """
+    Success response body for ``GET /api/v1/auth/me/``.
+    """
+
+    success = serializers.BooleanField(
+        default=True,
+        help_text="Indicates whether the request completed successfully.",
+    )
+    message = serializers.CharField(
+        default="Profile retrieved successfully.",
+        help_text="Human-readable status message.",
+    )
+    data = MeUserDataSerializer(
+        help_text="Authenticated user's profile data.",
+    )
+
+
+class MeErrorResponseSerializer(serializers.Serializer):
+    """
+    Error response body for ``GET /api/v1/auth/me/``.
+
+    Returned when no valid JWT token is supplied (401).
+    """
+
+    success = serializers.BooleanField(
+        default=False,
+        help_text="Always ``false`` for error responses.",
+    )
+    message = serializers.CharField(
+        help_text="Human-readable description of the error.",
+    )
+    errors = serializers.DictField(
+        default={},
+        help_text="Detail field from the authentication layer.",
+    )
+
+
+# ==============================================================================
+# Verify Email Serializers
+# ==============================================================================
+
+
+class VerifyEmailSuccessResponseSerializer(serializers.Serializer):
+    """
+    Success response body for ``GET /api/v1/auth/verify-email/``.
+    """
+
+    success = serializers.BooleanField(
+        default=True,
+        help_text="Indicates whether the request completed successfully.",
+    )
+    message = serializers.CharField(
+        default="Email verified successfully.",
+        help_text="Human-readable status message.",
+    )
+    data = serializers.DictField(
+        default={},
+        help_text="Always an empty object for this endpoint.",
+    )
+
+
+class VerifyEmailErrorResponseSerializer(serializers.Serializer):
+    """
+    Error response body for ``GET /api/v1/auth/verify-email/``.
+
+    Returned when the token is missing (400), invalid, or expired (400).
+    """
+
+    success = serializers.BooleanField(
+        default=False,
+        help_text="Always ``false`` for error responses.",
+    )
+    message = serializers.CharField(
+        help_text="Human-readable description of the error.",
+    )
+    errors = serializers.DictField(
+        default={},
+        help_text="Empty for token errors; reserved for future use.",
     )

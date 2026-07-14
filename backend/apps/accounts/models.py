@@ -67,6 +67,11 @@ class User(AbstractBaseUser, PermissionsMixin):
         default=False,
     )
 
+    locked_until = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Account remains locked until this time.",
+    )
     # Audit
     created_at = models.DateTimeField(
         auto_now_add=True,

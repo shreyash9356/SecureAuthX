@@ -6,6 +6,9 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
+from apps.audit_logs.models import AuditLog
+from apps.audit_logs.services import AuditLogService
+from apps.authentication.emails.verification import VerificationEmailService
 from apps.authentication.exceptions import (
     DuplicateEmailException,
     WeakPasswordException,
@@ -32,9 +35,18 @@ class RegistrationService:
         username: str | None = None,
         first_name: str = "",
         last_name: str = "",
+        request=None,
     ) -> dict:
         """
         Register a new user.
+
+        Args:
+            email:      User's email address.
+            password:   Plaintext password.
+            username:   Optional username.
+            first_name: Optional given name.
+            last_name:  Optional family name.
+            request:    HTTP request for IP/UA extraction.
 
         Raises:
             DuplicateEmailException
@@ -51,9 +63,7 @@ class RegistrationService:
         try:
             EnterprisePasswordValidator().validate(password)
         except ValidationError as exc:
-            raise WeakPasswordException(
-                message=" ".join(exc.messages)
-            ) from exc
+            raise WeakPasswordException(message=" ".join(exc.messages)) from exc
 
         # Create user
         user = User.objects.create_user(
@@ -67,12 +77,28 @@ class RegistrationService:
             is_locked=False,
         )
 
-        # Generate verification token
-        verification_token = TokenService.generate_email_verification_token(
-            user.id
+        # Generate verification token and send email
+        token = TokenService.generate_email_verification_token(user.id)
+        VerificationEmailService.send(user=user, token=token)
+
+        AuditLogService.log(
+            event_type=AuditLog.EventType.REGISTER,
+            status=AuditLog.Status.SUCCESS,
+            description=f"New user registered: {user.email}.",
+            user=user,
+            request=request,
+            resource="User",
+            resource_id=str(user.id),
         )
 
-        return {
-            "user": user,
-            "verification_token": verification_token,
-        }
+        AuditLogService.log(
+            event_type=AuditLog.EventType.EMAIL_VERIFICATION_SENT,
+            status=AuditLog.Status.INFO,
+            description=f"Verification email sent to {user.email}.",
+            user=user,
+            request=request,
+            resource="User",
+            resource_id=str(user.id),
+        )
+
+        return {"user": user}

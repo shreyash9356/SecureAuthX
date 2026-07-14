@@ -13,6 +13,8 @@ Security notes
 
 from django.contrib.auth import get_user_model
 
+from apps.audit_logs.models import AuditLog
+from apps.audit_logs.services import AuditLogService
 from apps.authentication.emails.password_reset import PasswordResetEmailService
 from apps.authentication.tokens import TokenService
 
@@ -25,7 +27,7 @@ class ForgotPasswordService:
     """
 
     @staticmethod
-    def send_reset_link(*, email: str) -> None:
+    def send_reset_link(*, email: str, request=None) -> None:
         """
         Generate a password reset token and send the reset email.
 
@@ -33,7 +35,8 @@ class ForgotPasswordService:
         value to infer whether the email address exists.
 
         Args:
-            email: The email address submitted by the user.
+            email:   The email address submitted by the user.
+            request: HTTP request for IP/UA extraction.
         """
 
         email = email.lower().strip()
@@ -41,13 +44,20 @@ class ForgotPasswordService:
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
-            # Prevent account enumeration — no exception is raised.
             return
 
-        # Only active, non-locked accounts receive the reset email.
         if not user.is_active or user.is_locked:
             return
 
         token = TokenService.generate_password_reset_token(user.id)
-
         PasswordResetEmailService.send(user, token)
+
+        AuditLogService.log(
+            event_type=AuditLog.EventType.PASSWORD_RESET_REQUESTED,
+            status=AuditLog.Status.INFO,
+            description=f"Password reset link requested for {user.email}.",
+            user=user,
+            request=request,
+            resource="User",
+            resource_id=str(user.id),
+        )

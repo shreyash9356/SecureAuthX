@@ -47,9 +47,7 @@ RESEND_VERIFICATION_SUCCESS = (
     "If the email exists and is not verified, a verification email has been sent."
 )
 
-PASSWORD_RESET_EMAIL_SENT = (
-    "If an account exists, a password reset link has been sent."
-)
+PASSWORD_RESET_EMAIL_SENT = "If an account exists, a password reset link has been sent."
 
 PASSWORD_RESET_SUCCESS = "Password reset successful."
 

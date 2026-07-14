@@ -48,57 +48,39 @@ class EnterprisePasswordValidator:
 
         # Maximum length
         if len(password) > self.MAX_LENGTH:
-            errors.append(
-                f"Password cannot exceed {self.MAX_LENGTH} characters."
-            )
+            errors.append(f"Password cannot exceed {self.MAX_LENGTH} characters.")
 
         # Uppercase
         if not re.search(r"[A-Z]", password):
-            errors.append(
-                "Password must contain at least one uppercase letter."
-            )
+            errors.append("Password must contain at least one uppercase letter.")
 
         # Lowercase
         if not re.search(r"[a-z]", password):
-            errors.append(
-                "Password must contain at least one lowercase letter."
-            )
+            errors.append("Password must contain at least one lowercase letter.")
 
         # Number
         if not re.search(r"\d", password):
-            errors.append(
-                "Password must contain at least one numeric digit."
-            )
+            errors.append("Password must contain at least one numeric digit.")
 
         # Special character
         if not re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>/?]", password):
-            errors.append(
-                "Password must contain at least one special character."
-            )
+            errors.append("Password must contain at least one special character.")
 
         # Sequential numbers
         if "123456" in password:
-            errors.append(
-                "Password must not contain sequential numbers."
-            )
+            errors.append("Password must not contain sequential numbers.")
 
         # Sequential letters
         if "abcdef" in password.lower():
-            errors.append(
-                "Password must not contain sequential letters."
-            )
+            errors.append("Password must not contain sequential letters.")
 
         # Keyboard pattern
         if "qwerty" in password.lower():
-            errors.append(
-                "Password must not contain keyboard patterns."
-            )
+            errors.append("Password must not contain keyboard patterns.")
 
         # Repeated characters
         if re.search(r"(.)\1{4,}", password):
-            errors.append(
-                "Password contains too many repeated characters."
-            )
+            errors.append("Password contains too many repeated characters.")
 
         if errors:
             raise ValidationError(errors)

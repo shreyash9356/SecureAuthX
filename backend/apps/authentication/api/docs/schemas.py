@@ -3,12 +3,27 @@
 
 Keeping schema definitions in a dedicated module separates documentation
 concerns from view logic. Views import and apply these decorators directly.
+
+Exported names consumed by views.py
+------------------------------------
+registration_schema, login_schema, refresh_token_schema, logout_schema,
+verify_email_schema, resend_verification_schema, me_schema,
+forgot_password_schema, reset_password_schema, change_password_schema,
+extend_schema   ← re-exported so views only need one import source
 """
 
-from drf_spectacular.utils import OpenApiResponse, extend_schema
-from drf_spectacular.utils import OpenApiParameter
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 
 from apps.authentication.api.docs.examples import (
+    # Registration
+    REGISTRATION_DUPLICATE_EMAIL_EXAMPLE,
+    REGISTRATION_MINIMAL_REQUEST_EXAMPLE,
+    REGISTRATION_REQUEST_EXAMPLE,
+    REGISTRATION_SERVER_ERROR_EXAMPLE,
+    REGISTRATION_SUCCESS_EXAMPLE,
+    REGISTRATION_VALIDATION_ERROR_EXAMPLE,
+    REGISTRATION_WEAK_PASSWORD_EXAMPLE,
+    # Login
     LOGIN_ACCOUNT_INACTIVE_EXAMPLE,
     LOGIN_ACCOUNT_LOCKED_EXAMPLE,
     LOGIN_EMAIL_NOT_VERIFIED_EXAMPLE,
@@ -17,51 +32,96 @@ from apps.authentication.api.docs.examples import (
     LOGIN_SERVER_ERROR_EXAMPLE,
     LOGIN_SUCCESS_EXAMPLE,
     LOGIN_VALIDATION_ERROR_EXAMPLE,
-    REGISTRATION_DUPLICATE_EMAIL_EXAMPLE,
-    REGISTRATION_MINIMAL_REQUEST_EXAMPLE,
-    REGISTRATION_REQUEST_EXAMPLE,
-    REGISTRATION_SERVER_ERROR_EXAMPLE,
-    REGISTRATION_SUCCESS_EXAMPLE,
-    REGISTRATION_VALIDATION_ERROR_EXAMPLE,
-    REGISTRATION_WEAK_PASSWORD_EXAMPLE,
+    # Token refresh
+    REFRESH_TOKEN_INVALID_EXAMPLE,
     REFRESH_TOKEN_REQUEST_EXAMPLE,
     REFRESH_TOKEN_SUCCESS_EXAMPLE,
-    REFRESH_TOKEN_INVALID_EXAMPLE,
+    # Logout
+    LOGOUT_INVALID_TOKEN_EXAMPLE,
     LOGOUT_REQUEST_EXAMPLE,
     LOGOUT_SUCCESS_EXAMPLE,
-    LOGOUT_INVALID_TOKEN_EXAMPLE,
+    # Email verification
+    VERIFY_EMAIL_SUCCESS_EXAMPLE,
+    VERIFY_EMAIL_MISSING_TOKEN_EXAMPLE,
+    VERIFY_EMAIL_INVALID_TOKEN_EXAMPLE,
+    # Resend verification
     RESEND_VERIFICATION_REQUEST_EXAMPLE,
     RESEND_VERIFICATION_SUCCESS_EXAMPLE,
-    
+    RESEND_VERIFICATION_VALIDATION_ERROR_EXAMPLE,
+    # Me (profile)
+    ME_SUCCESS_EXAMPLE,
+    ME_UNAUTHENTICATED_EXAMPLE,
+    # Forgot password
+    FORGOT_PASSWORD_REQUEST_EXAMPLE,
+    FORGOT_PASSWORD_SERVER_ERROR_EXAMPLE,
+    FORGOT_PASSWORD_SUCCESS_EXAMPLE,
+    FORGOT_PASSWORD_VALIDATION_ERROR_EXAMPLE,
+    # Reset password
+    RESET_PASSWORD_INVALID_TOKEN_EXAMPLE,
+    RESET_PASSWORD_MISMATCH_EXAMPLE,
+    RESET_PASSWORD_REQUEST_EXAMPLE,
+    RESET_PASSWORD_SERVER_ERROR_EXAMPLE,
+    RESET_PASSWORD_SUCCESS_EXAMPLE,
+    RESET_PASSWORD_VALIDATION_ERROR_EXAMPLE,
+    RESET_PASSWORD_WEAK_PASSWORD_EXAMPLE,
+    # Change password
+    CHANGE_PASSWORD_MISMATCH_EXAMPLE,
+    CHANGE_PASSWORD_REQUEST_EXAMPLE,
+    CHANGE_PASSWORD_SERVER_ERROR_EXAMPLE,
+    CHANGE_PASSWORD_SUCCESS_EXAMPLE,
+    CHANGE_PASSWORD_UNAUTHENTICATED_EXAMPLE,
+    CHANGE_PASSWORD_VALIDATION_ERROR_EXAMPLE,
+    CHANGE_PASSWORD_WEAK_PASSWORD_EXAMPLE,
+    CHANGE_PASSWORD_WRONG_CURRENT_EXAMPLE,
 )
 from apps.authentication.api.docs.serializers import (
-    LoginErrorResponseSerializer,
-    LoginSuccessResponseSerializer,
+    # Registration
     RegistrationErrorResponseSerializer,
     RegistrationSuccessResponseSerializer,
-    RefreshTokenSuccessResponseSerializer,
+    # Login
+    LoginErrorResponseSerializer,
+    LoginSuccessResponseSerializer,
+    # Token refresh
     RefreshTokenErrorResponseSerializer,
     RefreshTokenRequestSerializer,
+    RefreshTokenSuccessResponseSerializer,
+    # Logout
+    LogoutErrorResponseSerializer,
     LogoutRequestSerializer,
     LogoutSuccessResponseSerializer,
-    LogoutErrorResponseSerializer,
-    RefreshTokenDataSerializer,
+    # Email verification
+    VerifyEmailErrorResponseSerializer,
+    VerifyEmailSuccessResponseSerializer,
+    # Resend verification
+    ResendVerificationErrorResponseSerializer,
     ResendVerificationRequestSerializer,
     ResendVerificationSuccessResponseSerializer,
-    ResendVerificationErrorResponseSerializer,
+    # Me (profile)
+    MeErrorResponseSerializer,
+    MeSuccessResponseSerializer,
+    # Forgot password
+    ForgotPasswordErrorResponseSerializer,
+    ForgotPasswordRequestSerializer,
+    ForgotPasswordSuccessResponseSerializer,
+    # Reset password
+    ResetPasswordErrorResponseSerializer,
+    ResetPasswordRequestSerializer,
+    ResetPasswordSuccessResponseSerializer,
+    # Change password
+    ChangePasswordErrorResponseSerializer,
+    ChangePasswordRequestSerializer,
+    ChangePasswordSuccessResponseSerializer,
 )
-
 from apps.authentication.api.serializers import (
     LoginSerializer,
     RegistrationSerializer,
 )
 
 # ==============================================================================
-# Registration Schema
+# Registration
 # ==============================================================================
 
 registration_schema = extend_schema(
-    # ── Identity ───────────────────────────────────────────────────────────────
     summary="Register a new user account",
     description=(
         "Creates a new user account and sends an email verification link "
@@ -86,39 +146,25 @@ registration_schema = extend_schema(
         "- This endpoint does not require authentication."
     ),
     tags=["Authentication"],
-
-    # ── Request ────────────────────────────────────────────────────────────────
     request=RegistrationSerializer,
-
-    # ── Responses ─────────────────────────────────────────────────────────────
     responses={
         201: OpenApiResponse(
             response=RegistrationSuccessResponseSerializer,
-            description=(
-                "Account created successfully. "
-                "A verification email has been dispatched."
-            ),
+            description="Account created. Verification email dispatched.",
         ),
         400: OpenApiResponse(
             response=RegistrationErrorResponseSerializer,
-            description=(
-                "Request validation failed. "
-                "Inspect the ``errors`` object for field-level details."
-            ),
+            description="Request validation failed.",
         ),
         409: OpenApiResponse(
             response=RegistrationErrorResponseSerializer,
-            description=(
-                "An account with the supplied email address already exists."
-            ),
+            description="An account with this email already exists.",
         ),
         500: OpenApiResponse(
             response=RegistrationErrorResponseSerializer,
             description="Unexpected internal server error.",
         ),
     },
-
-    # ── Examples ──────────────────────────────────────────────────────────────
     examples=[
         REGISTRATION_REQUEST_EXAMPLE,
         REGISTRATION_MINIMAL_REQUEST_EXAMPLE,
@@ -131,11 +177,10 @@ registration_schema = extend_schema(
 )
 
 # ==============================================================================
-# Login Schema
+# Login
 # ==============================================================================
 
 login_schema = extend_schema(
-    # ── Identity ───────────────────────────────────────────────────────────────
     summary="Authenticate and obtain JWT tokens",
     description=(
         "Validates the supplied credentials and, on success, issues a "
@@ -155,6 +200,11 @@ login_schema = extend_schema(
         "2. The email address must be verified.\n"
         "3. The account must be active.\n"
         "4. The account must not be locked.\n\n"
+        "### Account Lockout Policy\n\n"
+        "After **5 consecutive failed login attempts** the account is automatically "
+        "locked for **30 minutes**. While locked, even a correct password will be "
+        "rejected with a 403. The lock lifts automatically — no manual intervention "
+        "is needed. The failed-attempt counter resets to zero on a successful login.\n\n"
         "A deliberate **generic error message** (`Invalid email or password.`) "
         "is returned for credential failures to prevent user enumeration.\n\n"
         "### Security Notes\n\n"
@@ -166,39 +216,24 @@ login_schema = extend_schema(
         "- This endpoint does not require authentication."
     ),
     tags=["Authentication"],
-
-    # ── Request ────────────────────────────────────────────────────────────────
     request=LoginSerializer,
-
-    # ── Responses ─────────────────────────────────────────────────────────────
     responses={
         200: OpenApiResponse(
             response=LoginSuccessResponseSerializer,
-            description=(
-                "Authentication successful. "
-                "JWT access and refresh tokens are included in the response body."
-            ),
+            description="Authentication successful. JWT tokens issued.",
         ),
         400: OpenApiResponse(
             response=LoginErrorResponseSerializer,
-            description=(
-                "Request body failed validation. "
-                "Inspect the ``errors`` object for field-level details."
-            ),
+            description="Request body failed validation.",
         ),
         401: OpenApiResponse(
             response=LoginErrorResponseSerializer,
-            description=(
-                "Authentication failed. "
-                "The email or password is incorrect."
-            ),
+            description="Invalid email or password.",
         ),
         403: OpenApiResponse(
             response=LoginErrorResponseSerializer,
             description=(
-                "Access denied. "
-                "The account email is unverified, the account is inactive, "
-                "or the account is locked."
+                "Access denied — email unverified, account inactive, or account locked."
             ),
         ),
         500: OpenApiResponse(
@@ -206,8 +241,6 @@ login_schema = extend_schema(
             description="Unexpected internal server error.",
         ),
     },
-
-    # ── Examples ──────────────────────────────────────────────────────────────
     examples=[
         LOGIN_REQUEST_EXAMPLE,
         LOGIN_SUCCESS_EXAMPLE,
@@ -220,24 +253,55 @@ login_schema = extend_schema(
     ],
 )
 
+# ==============================================================================
+# Me (Profile)
+# ==============================================================================
+
+me_schema = extend_schema(
+    summary="Retrieve the authenticated user's profile",
+    description=(
+        "Returns the profile information for the currently authenticated user.\n\n"
+        "### Authentication\n\n"
+        "A valid **JWT Bearer token** must be supplied in the "
+        "`Authorization` header:\n\n"
+        "```\nAuthorization: Bearer <access_token>\n```"
+    ),
+    tags=["Authentication"],
+    request=None,
+    responses={
+        200: OpenApiResponse(
+            response=MeSuccessResponseSerializer,
+            description="Profile retrieved successfully.",
+        ),
+        401: OpenApiResponse(
+            response=MeErrorResponseSerializer,
+            description="No valid JWT token provided.",
+        ),
+    },
+    examples=[
+        ME_SUCCESS_EXAMPLE,
+        ME_UNAUTHENTICATED_EXAMPLE,
+    ],
+)
 
 # ==============================================================================
-# REFRESH Schema
+# Token Refresh
 # ==============================================================================
-
 
 refresh_token_schema = extend_schema(
     summary="Refresh JWT access token",
     description=(
-        "Accepts a valid refresh token and returns a newly generated "
+        "Accepts a valid refresh token and returns a newly issued "
         "JWT access token.\n\n"
-        "The refresh token itself is not replaced by this endpoint. "
-        "Use this endpoint whenever the access token expires."
+        "### Token Rotation\n\n"
+        "Refresh tokens are **rotated on every use** "
+        "(`ROTATE_REFRESH_TOKENS = True`). The old refresh token is "
+        "immediately blacklisted. Always store the new refresh token "
+        "returned by `POST /api/v1/auth/login/` or this endpoint.\n\n"
+        "Use this endpoint whenever the access token expires (15-minute lifetime)."
     ),
     tags=["Authentication"],
-    # ── Request ──────────────────────────────────────────────────────────────
     request=RefreshTokenRequestSerializer,
-    # ── Response ──────────────────────────────────────────────────────────────
     responses={
         200: OpenApiResponse(
             response=RefreshTokenSuccessResponseSerializer,
@@ -248,7 +312,6 @@ refresh_token_schema = extend_schema(
             description="Refresh token is invalid or expired.",
         ),
     },
- # ── Examples ──────────────────────────────────────────────────────────────
     examples=[
         REFRESH_TOKEN_REQUEST_EXAMPLE,
         REFRESH_TOKEN_SUCCESS_EXAMPLE,
@@ -257,20 +320,17 @@ refresh_token_schema = extend_schema(
 )
 
 # ==============================================================================
-# Logout Schema
+# Logout
 # ==============================================================================
 
-
-
 logout_schema = extend_schema(
-    summary="Logout the authenticated user",
+    summary="Logout — blacklist the refresh token",
     description=(
         "Invalidates the supplied JWT refresh token by adding it to the "
         "Simple JWT blacklist.\n\n"
-        "After logout, the same refresh token cannot be used again to "
-        "obtain new access tokens.\n\n"
-        "Clients should delete any locally stored access and refresh tokens "
-        "after a successful logout."
+        "After logout the same refresh token cannot be used to obtain new "
+        "access tokens. Clients should also discard any locally stored "
+        "access token after calling this endpoint."
     ),
     tags=["Authentication"],
     request=LogoutRequestSerializer,
@@ -281,7 +341,7 @@ logout_schema = extend_schema(
         ),
         401: OpenApiResponse(
             response=LogoutErrorResponseSerializer,
-            description="Refresh token is invalid or expired.",
+            description="Refresh token is invalid or already blacklisted.",
         ),
     },
     examples=[
@@ -291,141 +351,114 @@ logout_schema = extend_schema(
     ],
 )
 
-
-
 # ==============================================================================
-# verify_email Schema
+# Verify Email
 # ==============================================================================
-
-
 
 verify_email_schema = extend_schema(
     summary="Verify email address",
     description=(
-        "Verifies a user's email address using the verification token "
-        "sent during registration."
+        "Verifies a user's email address using the signed verification token "
+        "dispatched during registration.\n\n"
+        "### Flow\n\n"
+        "1. User registers → verification email is sent.\n"
+        "2. User clicks the link → frontend extracts the `token` query parameter.\n"
+        "3. Frontend calls `GET /api/v1/auth/verify-email/?token=<token>`.\n"
+        "4. On success the account is activated and the user can log in.\n\n"
+        "### Token Details\n\n"
+        "- Signed with Django's `TimestampSigner` — tamper-proof.\n"
+        "- Expires after **24 hours**.\n"
+        "- This endpoint does not require authentication."
     ),
     tags=["Authentication"],
-
     parameters=[
         OpenApiParameter(
             name="token",
             type=str,
             location=OpenApiParameter.QUERY,
             required=True,
-            description="Email verification token.",
+            description=(
+                "Signed email verification token received in the registration email."
+            ),
         ),
     ],
-
     responses={
         200: OpenApiResponse(
-            description="Email verified successfully.",
+            response=VerifyEmailSuccessResponseSerializer,
+            description="Email verified successfully. Account is now active.",
         ),
         400: OpenApiResponse(
-            description="Verification token is missing, invalid or expired.",
+            response=VerifyEmailErrorResponseSerializer,
+            description="Token is missing, invalid, or expired.",
         ),
     },
+    examples=[
+        VERIFY_EMAIL_SUCCESS_EXAMPLE,
+        VERIFY_EMAIL_MISSING_TOKEN_EXAMPLE,
+        VERIFY_EMAIL_INVALID_TOKEN_EXAMPLE,
+    ],
 )
 
-
 # ==============================================================================
-# Resend Schema
+# Resend Verification
 # ==============================================================================
-
 
 resend_verification_schema = extend_schema(
-    summary="Resend verification email",
-    description="Generate and send a new email verification link.",
+    summary="Resend email verification link",
+    description=(
+        "Generates and sends a new email verification link for an unverified account.\n\n"
+        "### Account Enumeration Prevention\n\n"
+        "The same generic success response is always returned regardless of "
+        "whether the email is registered or already verified — preventing "
+        "attackers from enumerating valid addresses.\n\n"
+        "- This endpoint does not require authentication."
+    ),
     tags=["Authentication"],
     request=ResendVerificationRequestSerializer,
     responses={
         200: OpenApiResponse(
             response=ResendVerificationSuccessResponseSerializer,
-            description="Verification email sent.",
+            description="Request processed. Verification email sent if eligible.",
         ),
         400: OpenApiResponse(
             response=ResendVerificationErrorResponseSerializer,
-            description="Validation error.",
+            description="Request body failed field-level validation.",
         ),
     },
     examples=[
         RESEND_VERIFICATION_REQUEST_EXAMPLE,
         RESEND_VERIFICATION_SUCCESS_EXAMPLE,
+        RESEND_VERIFICATION_VALIDATION_ERROR_EXAMPLE,
     ],
 )
 
-
 # ==============================================================================
-# Import new examples and serializers needed for the three new schemas
-# ==============================================================================
-
-from apps.authentication.api.docs.examples import (
-    FORGOT_PASSWORD_REQUEST_EXAMPLE,
-    FORGOT_PASSWORD_SUCCESS_EXAMPLE,
-    FORGOT_PASSWORD_VALIDATION_ERROR_EXAMPLE,
-    FORGOT_PASSWORD_SERVER_ERROR_EXAMPLE,
-    RESET_PASSWORD_REQUEST_EXAMPLE,
-    RESET_PASSWORD_SUCCESS_EXAMPLE,
-    RESET_PASSWORD_INVALID_TOKEN_EXAMPLE,
-    RESET_PASSWORD_MISMATCH_EXAMPLE,
-    RESET_PASSWORD_WEAK_PASSWORD_EXAMPLE,
-    RESET_PASSWORD_VALIDATION_ERROR_EXAMPLE,
-    RESET_PASSWORD_SERVER_ERROR_EXAMPLE,
-    CHANGE_PASSWORD_REQUEST_EXAMPLE,
-    CHANGE_PASSWORD_SUCCESS_EXAMPLE,
-    CHANGE_PASSWORD_WRONG_CURRENT_EXAMPLE,
-    CHANGE_PASSWORD_MISMATCH_EXAMPLE,
-    CHANGE_PASSWORD_WEAK_PASSWORD_EXAMPLE,
-    CHANGE_PASSWORD_VALIDATION_ERROR_EXAMPLE,
-    CHANGE_PASSWORD_UNAUTHENTICATED_EXAMPLE,
-    CHANGE_PASSWORD_SERVER_ERROR_EXAMPLE,
-)
-from apps.authentication.api.docs.serializers import (
-    ForgotPasswordRequestSerializer,
-    ForgotPasswordSuccessResponseSerializer,
-    ForgotPasswordErrorResponseSerializer,
-    ResetPasswordRequestSerializer,
-    ResetPasswordSuccessResponseSerializer,
-    ResetPasswordErrorResponseSerializer,
-    ChangePasswordRequestSerializer,
-    ChangePasswordSuccessResponseSerializer,
-    ChangePasswordErrorResponseSerializer,
-)
-
-# ==============================================================================
-# Forgot Password Schema
+# Forgot Password
 # ==============================================================================
 
 forgot_password_schema = extend_schema(
     summary="Request a password reset link",
     description=(
         "Accepts an email address and dispatches a password reset link "
-        "if an active account is found.\n\n"
+        "if an active, non-locked account is found.\n\n"
         "### Account Enumeration Prevention\n\n"
         "The same generic success response is returned regardless of whether "
-        "the email address exists in the system. This prevents attackers from "
-        "determining which email addresses are registered.\n\n"
+        "the email exists — preventing attackers from enumerating accounts.\n\n"
         "### Reset Link\n\n"
-        "The emailed link contains a **signed token** that expires after "
+        "The emailed link embeds a **signed token** that expires after "
         "**30 minutes**. Pass this token to "
         "`POST /api/v1/auth/reset-password/` to set a new password.\n\n"
         "### Security Notes\n\n"
         "- Only active, non-locked accounts receive the reset email.\n"
-        "- Token is signed with Django's ``TimestampSigner`` — tamper-proof.\n"
+        "- Token is signed with Django's `TimestampSigner` — tamper-proof.\n"
         "- This endpoint does not require authentication."
     ),
     tags=["Password Management"],
-
-    # ── Request ────────────────────────────────────────────────────────────────
     request=ForgotPasswordRequestSerializer,
-
-    # ── Responses ─────────────────────────────────────────────────────────────
     responses={
         200: OpenApiResponse(
             response=ForgotPasswordSuccessResponseSerializer,
-            description=(
-                "Request processed. If the email exists, a reset link has been sent."
-            ),
+            description="Request processed. Reset link sent if account exists.",
         ),
         400: OpenApiResponse(
             response=ForgotPasswordErrorResponseSerializer,
@@ -436,8 +469,6 @@ forgot_password_schema = extend_schema(
             description="Unexpected internal server error.",
         ),
     },
-
-    # ── Examples ──────────────────────────────────────────────────────────────
     examples=[
         FORGOT_PASSWORD_REQUEST_EXAMPLE,
         FORGOT_PASSWORD_SUCCESS_EXAMPLE,
@@ -446,9 +477,8 @@ forgot_password_schema = extend_schema(
     ],
 )
 
-
 # ==============================================================================
-# Reset Password Schema
+# Reset Password
 # ==============================================================================
 
 reset_password_schema = extend_schema(
@@ -469,15 +499,11 @@ reset_password_schema = extend_schema(
         "- Must not be the same as the current password\n"
         "- Must not be a commonly used password\n\n"
         "### Security Notes\n\n"
-        "- The ``password_changed_at`` timestamp is updated on success.\n"
+        "- `password_changed_at` timestamp is updated on success.\n"
         "- This endpoint does not require authentication."
     ),
     tags=["Password Management"],
-
-    # ── Request ────────────────────────────────────────────────────────────────
     request=ResetPasswordRequestSerializer,
-
-    # ── Responses ─────────────────────────────────────────────────────────────
     responses={
         200: OpenApiResponse(
             response=ResetPasswordSuccessResponseSerializer,
@@ -486,8 +512,8 @@ reset_password_schema = extend_schema(
         400: OpenApiResponse(
             response=ResetPasswordErrorResponseSerializer,
             description=(
-                "Token is invalid or expired, passwords do not match, "
-                "or the new password fails policy checks."
+                "Token invalid/expired, passwords do not match, "
+                "or new password fails policy checks."
             ),
         ),
         500: OpenApiResponse(
@@ -495,8 +521,6 @@ reset_password_schema = extend_schema(
             description="Unexpected internal server error.",
         ),
     },
-
-    # ── Examples ──────────────────────────────────────────────────────────────
     examples=[
         RESET_PASSWORD_REQUEST_EXAMPLE,
         RESET_PASSWORD_SUCCESS_EXAMPLE,
@@ -508,16 +532,14 @@ reset_password_schema = extend_schema(
     ],
 )
 
-
 # ==============================================================================
-# Change Password Schema
+# Change Password
 # ==============================================================================
 
 change_password_schema = extend_schema(
     summary="Change password (authenticated users only)",
     description=(
-        "Allows an authenticated user to change their own password by "
-        "providing the current password and a new password.\n\n"
+        "Allows an authenticated user to change their own password.\n\n"
         "### Authentication\n\n"
         "A valid **JWT Bearer token** must be supplied in the "
         "`Authorization` header:\n\n"
@@ -532,16 +554,12 @@ change_password_schema = extend_schema(
         "- Must not be the same as the current password\n"
         "- Must not be a commonly used password\n\n"
         "### Security Notes\n\n"
-        "- The ``password_changed_at`` timestamp is updated on success.\n"
+        "- `password_changed_at` timestamp is updated on success.\n"
         "- A generic error is returned for an incorrect current password "
         "to prevent timing-based enumeration."
     ),
     tags=["Password Management"],
-
-    # ── Request ────────────────────────────────────────────────────────────────
     request=ChangePasswordRequestSerializer,
-
-    # ── Responses ─────────────────────────────────────────────────────────────
     responses={
         200: OpenApiResponse(
             response=ChangePasswordSuccessResponseSerializer,
@@ -549,23 +567,17 @@ change_password_schema = extend_schema(
         ),
         400: OpenApiResponse(
             response=ChangePasswordErrorResponseSerializer,
-            description=(
-                "Passwords do not match or the new password fails policy checks."
-            ),
+            description="Passwords do not match or new password fails policy checks.",
         ),
         401: OpenApiResponse(
             response=ChangePasswordErrorResponseSerializer,
-            description=(
-                "No valid JWT token provided, or the current password is incorrect."
-            ),
+            description="No valid JWT token provided, or current password is incorrect.",
         ),
         500: OpenApiResponse(
             response=ChangePasswordErrorResponseSerializer,
             description="Unexpected internal server error.",
         ),
     },
-
-    # ── Examples ──────────────────────────────────────────────────────────────
     examples=[
         CHANGE_PASSWORD_REQUEST_EXAMPLE,
         CHANGE_PASSWORD_SUCCESS_EXAMPLE,

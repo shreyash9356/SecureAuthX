@@ -1,9 +1,12 @@
 """
-Resend email verification service.
+Resend email verification service for the SecureAuthX authentication module.
 """
 
 from django.contrib.auth import get_user_model
 
+from apps.audit_logs.models import AuditLog
+from apps.audit_logs.services import AuditLogService
+from apps.authentication.emails.verification import VerificationEmailService
 from apps.authentication.tokens import TokenService
 
 User = get_user_model()
@@ -15,31 +18,37 @@ class ResendVerificationService:
     """
 
     @staticmethod
-    def resend(*, email: str) -> bool:
+    def resend(*, email: str, request=None) -> None:
         """
-        Generate a new verification token for an unverified user.
+        Generate a new verification token and resend the verification email.
 
-        Returns:
-            bool:
-                True if an email should be sent.
-                False if nothing should be sent.
+        Always returns silently — callers must not rely on the return
+        value to determine whether the email exists (anti-enumeration).
+
+        Args:
+            email:   The email address submitted by the user.
+            request: HTTP request for IP/UA extraction.
         """
 
         email = email.lower().strip()
 
         try:
             user = User.objects.get(email=email)
-
         except User.DoesNotExist:
-            # Generic response to prevent user enumeration
-            return False
+            return
 
         if user.is_verified:
-            return False
+            return
 
         token = TokenService.generate_email_verification_token(user.id)
+        VerificationEmailService.send(user=user, token=token)
 
-        # Email sending will be implemented later
-        # VerificationEmailService.send(user, token)
-
-        return True
+        AuditLogService.log(
+            event_type=AuditLog.EventType.EMAIL_VERIFICATION_SENT,
+            status=AuditLog.Status.INFO,
+            description=f"Verification email resent to {user.email}.",
+            user=user,
+            request=request,
+            resource="User",
+            resource_id=str(user.id),
+        )
