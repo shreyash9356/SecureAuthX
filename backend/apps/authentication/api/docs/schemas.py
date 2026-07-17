@@ -12,7 +12,61 @@ forgot_password_schema, reset_password_schema, change_password_schema,
 extend_schema   ← re-exported so views only need one import source
 """
 
-from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
+from drf_spectacular.utils import (
+    OpenApiExample,
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+    inline_serializer,
+)
+from rest_framework import serializers
+
+
+# ==============================================================================
+# Reusable Throttling Schema
+# ==============================================================================
+
+ThrottledErrorResponseSerializer = inline_serializer(
+    name="ThrottledErrorResponse",
+    fields={
+        "success": serializers.BooleanField(
+            default=False,
+            help_text="Always ``false`` for throttled error responses.",
+        ),
+        "message": serializers.CharField(
+            default="Too many requests. Please try again later.",
+            help_text="Human-readable summary of the error.",
+        ),
+        "errors": inline_serializer(
+            name="ThrottledErrorDetails",
+            fields={
+                "retry_after": serializers.IntegerField(
+                    help_text="The number of seconds to wait before retrying the request."
+                )
+            },
+        ),
+    },
+)
+
+THROTTLED_RESPONSE_EXAMPLE = OpenApiExample(
+    name="ThrottledResponse",
+    summary="Rate limit exceeded",
+    description="Returned when the client exceeds the configured rate limit.",
+    value={
+        "success": False,
+        "message": "Too many requests. Please try again later.",
+        "errors": {
+            "retry_after": 42
+        }
+    },
+    status_codes=["429"],
+)
+
+throttled_response = OpenApiResponse(
+    response=ThrottledErrorResponseSerializer,
+    description="Returned when the client exceeds the configured rate limit for this endpoint.",
+    examples=[THROTTLED_RESPONSE_EXAMPLE],
+)
 
 from apps.authentication.api.docs.examples import (
     # Registration
@@ -236,6 +290,7 @@ login_schema = extend_schema(
                 "Access denied — email unverified, account inactive, or account locked."
             ),
         ),
+        429: throttled_response,
         500: OpenApiResponse(
             response=LoginErrorResponseSerializer,
             description="Unexpected internal server error.",
@@ -249,6 +304,7 @@ login_schema = extend_schema(
         LOGIN_EMAIL_NOT_VERIFIED_EXAMPLE,
         LOGIN_ACCOUNT_LOCKED_EXAMPLE,
         LOGIN_ACCOUNT_INACTIVE_EXAMPLE,
+        THROTTLED_RESPONSE_EXAMPLE,
         LOGIN_SERVER_ERROR_EXAMPLE,
     ],
 )
@@ -424,11 +480,13 @@ resend_verification_schema = extend_schema(
             response=ResendVerificationErrorResponseSerializer,
             description="Request body failed field-level validation.",
         ),
+        429: throttled_response,
     },
     examples=[
         RESEND_VERIFICATION_REQUEST_EXAMPLE,
         RESEND_VERIFICATION_SUCCESS_EXAMPLE,
         RESEND_VERIFICATION_VALIDATION_ERROR_EXAMPLE,
+        THROTTLED_RESPONSE_EXAMPLE,
     ],
 )
 
@@ -464,6 +522,7 @@ forgot_password_schema = extend_schema(
             response=ForgotPasswordErrorResponseSerializer,
             description="Request body failed field-level validation.",
         ),
+        429: throttled_response,
         500: OpenApiResponse(
             response=ForgotPasswordErrorResponseSerializer,
             description="Unexpected internal server error.",
@@ -473,6 +532,7 @@ forgot_password_schema = extend_schema(
         FORGOT_PASSWORD_REQUEST_EXAMPLE,
         FORGOT_PASSWORD_SUCCESS_EXAMPLE,
         FORGOT_PASSWORD_VALIDATION_ERROR_EXAMPLE,
+        THROTTLED_RESPONSE_EXAMPLE,
         FORGOT_PASSWORD_SERVER_ERROR_EXAMPLE,
     ],
 )

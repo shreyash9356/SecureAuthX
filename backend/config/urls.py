@@ -18,6 +18,11 @@ urlpatterns = [
         "api/v1/auth/",
         include("apps.authentication.api.urls"),
     ),
+    # Authorization API
+    path(
+        "api/v1/authorization/",
+        include("apps.authorization.api.urls"),
+    ),
     # Audit Logs API
     path(
         "api/v1/audit-logs/",

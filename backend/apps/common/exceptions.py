@@ -198,9 +198,10 @@ def _handle_drf_exception(exc, drf_response: Response) -> Response:
     # 429 — Rate limit exceeded
     # ------------------------------------------------------------------
     if isinstance(exc, Throttled):
+        wait = getattr(exc, "wait", None)
         return _error_response(
             message="Too many requests. Please try again later.",
-            errors=errors,
+            errors={"retry_after": wait} if wait is not None else {},
             http_status=status.HTTP_429_TOO_MANY_REQUESTS,
         )
 

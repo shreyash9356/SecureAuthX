@@ -52,6 +52,11 @@ from apps.authentication.constants import (
 from apps.authentication.services.email_verification import EmailVerificationService
 from apps.authentication.services.profile import ProfileService
 from apps.authentication.utils import success_response
+from apps.authentication.throttling import (
+    LoginRateThrottle,
+    ForgotPasswordRateThrottle,
+    ResendVerificationRateThrottle,
+)
 
 
 # ==============================================================================
@@ -95,6 +100,7 @@ class LoginAPIView(APIView):
     """API endpoint for user authentication."""
 
     permission_classes = [AllowAny]
+    throttle_classes = [LoginRateThrottle]
 
     def post(self, request):
         serializer = LoginSerializer(
@@ -234,6 +240,7 @@ class ResendVerificationAPIView(APIView):
     """API endpoint for resending verification emails."""
 
     permission_classes = [AllowAny]
+    throttle_classes = [ResendVerificationRateThrottle]
 
     def post(self, request):
         serializer = ResendVerificationSerializer(
@@ -259,6 +266,7 @@ class ForgotPasswordAPIView(APIView):
     """API endpoint for requesting a password reset link."""
 
     permission_classes = [AllowAny]
+    throttle_classes = [ForgotPasswordRateThrottle]
 
     def post(self, request):
         serializer = ForgotPasswordSerializer(
