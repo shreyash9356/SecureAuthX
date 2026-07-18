@@ -11,7 +11,7 @@ ROLES_SCHEMA = [
     {
         "name": "Super Administrator",
         "slug": RoleSlugs.SUPER_ADMIN,
-        "description": "System-defined root administrator with full unrestricted access to all domains.",
+        "description": "Full platform administrator. Has unrestricted access to every SecureAuthX module. Responsible for platform administration, security policies, organizations, users, permissions, roles, MFA, audit logs, notifications and all system configuration.",
         "priority": 1000,
         "is_system": True,
         "is_active": True
@@ -19,7 +19,7 @@ ROLES_SCHEMA = [
     {
         "name": "Administrator",
         "slug": RoleSlugs.ADMIN,
-        "description": "System-defined administrator with operational capabilities across resources.",
+        "description": "Platform administrator with administrative privileges according to assigned permissions. Can manage users, organizations and platform resources but remains governed by RBAC.",
         "priority": 800,
         "is_system": True,
         "is_active": True
@@ -27,15 +27,31 @@ ROLES_SCHEMA = [
     {
         "name": "Manager",
         "slug": RoleSlugs.MANAGER,
-        "description": "System-defined manager with standard operations and management read capabilities.",
+        "description": "Business manager responsible for managing teams, employees and organizational resources according to assigned permissions.",
         "priority": 500,
+        "is_system": True,
+        "is_active": True
+    },
+    {
+        "name": "Auditor",
+        "slug": RoleSlugs.AUDITOR,
+        "description": "Read-only access to audit logs, compliance reports and security information. Cannot modify production data.",
+        "priority": 300,
+        "is_system": True,
+        "is_active": True
+    },
+    {
+        "name": "Support",
+        "slug": RoleSlugs.SUPPORT,
+        "description": "Support engineer responsible for assisting users with limited administrative permissions. Does not receive unrestricted administrative access.",
+        "priority": 200,
         "is_system": True,
         "is_active": True
     },
     {
         "name": "Employee",
         "slug": RoleSlugs.EMPLOYEE,
-        "description": "System-defined employee role with basic access to profiles and notifications.",
+        "description": "Standard authenticated enterprise employee with access according to assigned permissions. This is the default enterprise user role.",
         "priority": 100,
         "is_system": True,
         "is_active": True

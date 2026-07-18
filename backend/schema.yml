@@ -1,0 +1,5064 @@
+openapi: 3.0.3
+info:
+  title: SecureAuthX API
+  version: 1.0.0
+  description: |
+    ## Overview
+
+    SecureAuthX is an **enterprise-grade Identity and Access Management (IAM)** platform built with Django REST Framework and React.
+
+    The API provides secure authentication, authorization, user management, role-based access control (RBAC), multi-factor authentication (MFA), audit logging, and session management.
+
+    ## Authentication
+
+    Most endpoints require a valid **JWT Bearer token**. Obtain tokens via `POST /api/v1/auth/login/` and include the access token in the `Authorization` header:
+
+    ```
+    Authorization: Bearer <access_token>
+    ```
+
+    Access tokens expire after **15 minutes**. Use `POST /api/v1/auth/token/refresh/` to obtain a new access token using your refresh token.
+
+    ## Standards
+
+    - OWASP Top 10
+    - OWASP ASVS Level 2
+    - NIST SP 800-63B
+  contact:
+    name: SecureAuthX Team
+    email: support@secureauthx.local
+  license:
+    name: MIT
+paths:
+  /api/v1/auth/register/:
+    post:
+      operationId: api_v1_auth_register_create
+      description: |-
+        Creates a new user account and sends an email verification link to the supplied address.
+
+        **The account cannot be used to log in until the email address is verified.**
+
+        ### Password Policy
+
+        Passwords must satisfy all of the following requirements:
+
+        - Minimum length: **12 characters**
+        - At least one **uppercase** letter (A–Z)
+        - At least one **lowercase** letter (a–z)
+        - At least one **digit** (0–9)
+        - At least one **special character** (!@#$%^&* etc.)
+        - Must not be a commonly used password
+        - Must not be too similar to the email address
+
+        ### Duplicate Email Handling
+
+        If the email is already registered, a `409 Conflict` is returned. No information about the existing account is disclosed.
+
+        ### Security Notes
+
+        - Passwords are hashed with **Argon2id** before storage.
+        - The verification token is single-use and expires after **24 hours**.
+        - This endpoint does not require authentication.
+      summary: Register a new user account
+      tags:
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistrationRequest'
+            examples:
+              RegistrationRequest:
+                value:
+                  email: john.doe@example.com
+                  username: johndoe
+                  first_name: John
+                  last_name: Doe
+                  password: Str0ng!Passw0rd#2025
+                  confirm_password: Str0ng!Passw0rd#2025
+                summary: Standard registration with all fields
+                description: A complete registration payload including optional profile
+                  fields. ``email`` and ``password`` are the only required fields.
+                  Passwords must be at least 12 characters and meet the enterprise
+                  password policy (uppercase, lowercase, digit, special character).
+              MinimalRegistrationRequest:
+                value:
+                  email: jane.doe@example.com
+                  password: Str0ng!Passw0rd#2025
+                  confirm_password: Str0ng!Passw0rd#2025
+                summary: Registration with required fields only
+                description: A minimal registration payload. ``username``, ``first_name``,
+                  and ``last_name`` are optional.
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegistrationRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegistrationRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationSuccessResponse'
+              examples:
+                RegistrationSuccessful:
+                  value:
+                    success: true
+                    message: Registration successful. Please verify your email.
+                    data:
+                      user_id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+                      email: john.doe@example.com
+                  summary: Account created — email verification required
+                  description: Returned when the account is created successfully.
+                    The user must verify their email address before they can log in.
+          description: Account created. Verification email dispatched.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationErrorResponse'
+              examples:
+                ValidationError:
+                  value:
+                    success: false
+                    message: Request validation failed.
+                    errors:
+                      confirm_password:
+                      - Passwords do not match.
+                      email:
+                      - Enter a valid email address.
+                  summary: Request body failed validation
+                  description: Returned when one or more fields fail serializer validation,
+                    for example when passwords do not match or the email format is
+                    invalid.
+                WeakPassword:
+                  value:
+                    success: false
+                    message: Password does not meet security requirements.
+                    errors: {}
+                  summary: Password does not meet the enterprise password policy
+                  description: Returned when the supplied password fails the enterprise
+                    password policy. Passwords must be at least 12 characters and
+                    include uppercase letters, lowercase letters, digits, and special
+                    characters.
+          description: Request validation failed.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationErrorResponse'
+              examples:
+                DuplicateEmail:
+                  value:
+                    success: false
+                    message: An account with this email already exists.
+                    errors: {}
+                  summary: An account with this email already exists
+                  description: Returned when a registration request uses an email
+                    address that is already associated with an existing account. For
+                    security, no information about the existing account is disclosed.
+          description: An account with this email already exists.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationErrorResponse'
+              examples:
+                InternalServerError:
+                  value:
+                    success: false
+                    message: Internal server error.
+                    errors: {}
+                  summary: Unexpected server-side failure
+                  description: Returned when an unexpected error occurs during registration.
+                    Details are not exposed in production environments.
+          description: Unexpected internal server error.
+  /api/v1/auth/me/:
+    get:
+      operationId: api_v1_auth_me_retrieve
+      description: |-
+        Returns the profile information for the currently authenticated user.
+
+        ### Authentication
+
+        A valid **JWT Bearer token** must be supplied in the `Authorization` header:
+
+        ```
+        Authorization: Bearer <access_token>
+        ```
+      summary: Retrieve the authenticated user's profile
+      tags:
+      - Authentication
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeSuccessResponse'
+              examples:
+                Me—Success:
+                  value:
+                    success: true
+                    message: Profile retrieved successfully.
+                    data:
+                      id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+                      email: john.doe@example.com
+                      username: johndoe
+                      first_name: John
+                      last_name: Doe
+                      full_name: John Doe
+                      is_verified: true
+                      is_active: true
+                      created_at: '2025-01-15T10:30:00Z'
+                  summary: Authenticated user profile retrieved
+                  description: Returned when a valid JWT access token is supplied.
+                    Contains the full profile of the authenticated user.
+          description: Profile retrieved successfully.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeErrorResponse'
+              examples:
+                Me—Unauthenticated:
+                  value:
+                    success: false
+                    message: Authentication credentials were not provided.
+                    errors:
+                      detail: Authentication credentials were not provided.
+                  summary: No valid JWT token provided
+                  description: Returned when the ``Authorization`` header is missing
+                    or contains an invalid/expired access token.
+          description: No valid JWT token provided.
+  /api/v1/auth/login/:
+    post:
+      operationId: api_v1_auth_login_create
+      description: |-
+        Validates the supplied credentials and, on success, issues a short-lived **JWT access token** and a long-lived **JWT refresh token**.
+
+        ### Token Usage
+
+        | Token | Lifetime | Usage |
+        |---|---|---|
+        | Access token | 15 minutes | `Authorization: Bearer <token>` header |
+        | Refresh token | 7 days | `POST /api/v1/auth/token/refresh/` |
+
+        ### Token Storage Recommendations
+
+        - Store the **access token** in memory only (not in `localStorage` or `sessionStorage`) to mitigate XSS risks.
+        - Store the **refresh token** in an `HttpOnly`, `Secure`, `SameSite=Strict` cookie to prevent JavaScript access.
+
+        ### Authentication Checks (in order)
+
+        1. Credentials must match a registered account.
+        2. The email address must be verified.
+        3. The account must be active.
+        4. The account must not be locked.
+
+        ### Account Lockout Policy
+
+        After **5 consecutive failed login attempts** the account is automatically locked for **30 minutes**. While locked, even a correct password will be rejected with a 403. The lock lifts automatically — no manual intervention is needed. The failed-attempt counter resets to zero on a successful login.
+
+        A deliberate **generic error message** (`Invalid email or password.`) is returned for credential failures to prevent user enumeration.
+
+        ### Security Notes
+
+        - Email lookup is case-insensitive.
+        - Refresh tokens are automatically rotated on each use (`ROTATE_REFRESH_TOKENS = True`).
+        - Rotated refresh tokens are blacklisted immediately (`BLACKLIST_AFTER_ROTATION = True`).
+        - This endpoint does not require authentication.
+      summary: Authenticate and obtain JWT tokens
+      tags:
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              LoginRequest:
+                value:
+                  email: john.doe@example.com
+                  password: Str0ng!Passw0rd#2025
+                summary: Authenticate with email and password
+                description: Submit valid credentials to receive a JWT access token
+                  and refresh token. The email address is case-insensitive.
+              ThrottledResponse:
+                value:
+                  success: false
+                  message: Too many requests. Please try again later.
+                  errors:
+                    retry_after: 42
+                summary: Rate limit exceeded
+                description: Returned when the client exceeds the configured rate
+                  limit.
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginSuccessResponse'
+              examples:
+                LoginSuccessful:
+                  value:
+                    success: true
+                    message: Login successful.
+                    data:
+                      access: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiYTFiMmMzZDQtZTVmNi03ODkwLWFiY2QtZWYxMjM0NTY3ODkwIiwiZXhwIjoxNzUyMDAwMDAwfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+                      refresh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiYTFiMmMzZDQtZTVmNi03ODkwLWFiY2QtZWYxMjM0NTY3ODkwIiwidG9rZW5fdHlwZSI6InJlZnJlc2gifQ.dGVzdC1yZWZyZXNoLXRva2Vu
+                      user:
+                        id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+                        email: john.doe@example.com
+                        first_name: John
+                        last_name: Doe
+                  summary: Authentication succeeded — JWT tokens issued
+                  description: Returned when credentials are valid, the email is verified,
+                    and the account is active and unlocked. Store the ``access`` token
+                    securely (memory only, not localStorage). Store the ``refresh``
+                    token in an HttpOnly cookie.
+          description: Authentication successful. JWT tokens issued.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginErrorResponse'
+              examples:
+                ValidationError:
+                  value:
+                    success: false
+                    message: Request validation failed.
+                    errors:
+                      email:
+                      - This field is required.
+                      password:
+                      - This field is required.
+                  summary: Request body failed validation
+                  description: Returned when the request body is malformed, for example
+                    a missing required field or an invalid email format.
+          description: Request body failed validation.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginErrorResponse'
+              examples:
+                InvalidCredentials:
+                  value:
+                    success: false
+                    message: Invalid email or password.
+                    errors: {}
+                  summary: Email or password is incorrect
+                  description: Returned when the email and password combination does
+                    not match any account. A deliberately generic message is used
+                    to prevent user enumeration attacks.
+          description: Invalid email or password.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginErrorResponse'
+              examples:
+                EmailNotVerified:
+                  value:
+                    success: false
+                    message: Your email address has not been verified.
+                    errors: {}
+                  summary: Account email address has not been verified
+                  description: Returned when the credentials are valid but the user
+                    has not yet verified their email address. Direct the user to check
+                    their inbox or request a new verification email.
+                AccountLocked:
+                  value:
+                    success: false
+                    message: Your account has been locked.
+                    errors: {}
+                  summary: Account has been locked due to excessive failed attempts
+                  description: Returned when the account is locked after exceeding
+                    the maximum number of consecutive failed login attempts. The user
+                    must contact support to unlock their account.
+                AccountInactive:
+                  value:
+                    success: false
+                    message: Your account is inactive. Please contact support.
+                    errors: {}
+                  summary: Account has been deactivated
+                  description: Returned when the account exists but has been deactivated
+                    by an administrator.
+          description: Access denied — email unverified, account inactive, or account
+            locked.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThrottledErrorResponse'
+              examples:
+                ThrottledResponse:
+                  value:
+                    success: false
+                    message: Too many requests. Please try again later.
+                    errors:
+                      retry_after: 42
+                  summary: Rate limit exceeded
+                  description: Returned when the client exceeds the configured rate
+                    limit.
+          description: Returned when the client exceeds the configured rate limit
+            for this endpoint.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginErrorResponse'
+              examples:
+                InternalServerError:
+                  value:
+                    success: false
+                    message: Internal server error.
+                    errors: {}
+                  summary: Unexpected server-side failure
+                  description: Returned when an unexpected error occurs during authentication.
+                    Details are not exposed in production environments.
+          description: Unexpected internal server error.
+  /api/v1/auth/logout/:
+    post:
+      operationId: api_v1_auth_logout_create
+      description: |-
+        Invalidates the supplied JWT refresh token by adding it to the Simple JWT blacklist.
+
+        After logout the same refresh token cannot be used to obtain new access tokens. Clients should also discard any locally stored access token after calling this endpoint.
+      summary: Logout — blacklist the refresh token
+      tags:
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequestRequest'
+            examples:
+              LogoutRequest:
+                value:
+                  refresh: eyJhbGciOiJIUzI1NiIs...
+                summary: Logout request
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LogoutRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LogoutRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutSuccessResponse'
+              examples:
+                LogoutSuccessful:
+                  value:
+                    success: true
+                    message: Logout successful.
+                    data: {}
+                  summary: Logout successful
+          description: Logout successful.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutErrorResponse'
+              examples:
+                InvalidRefreshToken:
+                  value:
+                    success: false
+                    message: Refresh token is invalid or expired.
+                    errors: {}
+                  summary: Invalid refresh token
+          description: Refresh token is invalid or already blacklisted.
+  /api/v1/auth/token/refresh/:
+    post:
+      operationId: api_v1_auth_token_refresh_create
+      description: |-
+        Accepts a valid refresh token and returns a newly issued JWT access token.
+
+        ### Token Rotation
+
+        Refresh tokens are **rotated on every use** (`ROTATE_REFRESH_TOKENS = True`). The old refresh token is immediately blacklisted. Always store the new refresh token returned by `POST /api/v1/auth/login/` or this endpoint.
+
+        Use this endpoint whenever the access token expires (15-minute lifetime).
+      summary: Refresh JWT access token
+      tags:
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequestRequest'
+            examples:
+              RefreshAccessToken:
+                value:
+                  refresh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                summary: Refresh access token
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshTokenSuccessResponse'
+              examples:
+                Success:
+                  value:
+                    success: true
+                    message: Access token refreshed successfully.
+                    data:
+                      access: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+          description: Access token refreshed successfully.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshTokenErrorResponse'
+              examples:
+                InvalidRefreshToken:
+                  value:
+                    success: false
+                    message: Refresh token is invalid or expired.
+                    errors: {}
+                  summary: Invalid refresh token
+          description: Refresh token is invalid or expired.
+  /api/v1/auth/verify-email/:
+    get:
+      operationId: api_v1_auth_verify_email_retrieve
+      description: |-
+        Verifies a user's email address using the signed verification token dispatched during registration.
+
+        ### Flow
+
+        1. User registers → verification email is sent.
+        2. User clicks the link → frontend extracts the `token` query parameter.
+        3. Frontend calls `GET /api/v1/auth/verify-email/?token=<token>`.
+        4. On success the account is activated and the user can log in.
+
+        ### Token Details
+
+        - Signed with Django's `TimestampSigner` — tamper-proof.
+        - Expires after **24 hours**.
+        - This endpoint does not require authentication.
+      summary: Verify email address
+      parameters:
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: Signed email verification token received in the registration
+          email.
+        required: true
+      tags:
+      - Authentication
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyEmailSuccessResponse'
+              examples:
+                VerifyEmail—Success:
+                  value:
+                    success: true
+                    message: Email verified successfully.
+                    data: {}
+                  summary: Email verified successfully
+                  description: Returned when the signed verification token is valid
+                    and the account is now active.
+          description: Email verified successfully. Account is now active.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyEmailErrorResponse'
+              examples:
+                VerifyEmail—MissingToken:
+                  value:
+                    success: false
+                    message: Verification token is required.
+                    errors: {}
+                  summary: No token query parameter supplied
+                  description: Returned when the ``token`` query parameter is absent
+                    from the request.
+                VerifyEmail—InvalidOrExpiredToken:
+                  value:
+                    success: false
+                    message: Verification link is invalid or has expired.
+                    errors: {}
+                  summary: Token is tampered with or has exceeded the 24-hour validity
+                    window
+                  description: Returned when the signed token cannot be verified or
+                    has expired. The user must request a new verification email.
+          description: Token is missing, invalid, or expired.
+  /api/v1/auth/resend-verification/:
+    post:
+      operationId: api_v1_auth_resend_verification_create
+      description: |-
+        Generates and sends a new email verification link for an unverified account.
+
+        ### Account Enumeration Prevention
+
+        The same generic success response is always returned regardless of whether the email is registered or already verified — preventing attackers from enumerating valid addresses.
+
+        - This endpoint does not require authentication.
+      summary: Resend email verification link
+      tags:
+      - Authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResendVerificationRequestRequest'
+            examples:
+              ResendVerificationEmail:
+                value:
+                  email: john@example.com
+                summary: Resend verification email
+              ThrottledResponse:
+                value:
+                  success: false
+                  message: Too many requests. Please try again later.
+                  errors:
+                    retry_after: 42
+                summary: Rate limit exceeded
+                description: Returned when the client exceeds the configured rate
+                  limit.
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ResendVerificationRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ResendVerificationRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResendVerificationSuccessResponse'
+              examples:
+                Success:
+                  value:
+                    success: true
+                    message: If the email exists and is not verified, a verification
+                      email has been sent.
+                    data: {}
+          description: Request processed. Verification email sent if eligible.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResendVerificationErrorResponse'
+              examples:
+                ResendVerification—ValidationError:
+                  value:
+                    success: false
+                    message: Request validation failed.
+                    errors:
+                      email:
+                      - Enter a valid email address.
+                  summary: Invalid email format
+                  description: Returned when the submitted email fails format validation.
+          description: Request body failed field-level validation.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThrottledErrorResponse'
+              examples:
+                ThrottledResponse:
+                  value:
+                    success: false
+                    message: Too many requests. Please try again later.
+                    errors:
+                      retry_after: 42
+                  summary: Rate limit exceeded
+                  description: Returned when the client exceeds the configured rate
+                    limit.
+          description: Returned when the client exceeds the configured rate limit
+            for this endpoint.
+  /api/v1/auth/forgot-password/:
+    post:
+      operationId: api_v1_auth_forgot_password_create
+      description: |-
+        Accepts an email address and dispatches a password reset link if an active, non-locked account is found.
+
+        ### Account Enumeration Prevention
+
+        The same generic success response is returned regardless of whether the email exists — preventing attackers from enumerating accounts.
+
+        ### Reset Link
+
+        The emailed link embeds a **signed token** that expires after **30 minutes**. Pass this token to `POST /api/v1/auth/reset-password/` to set a new password.
+
+        ### Security Notes
+
+        - Only active, non-locked accounts receive the reset email.
+        - Token is signed with Django's `TimestampSigner` — tamper-proof.
+        - This endpoint does not require authentication.
+      summary: Request a password reset link
+      tags:
+      - Password Management
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequestRequest'
+            examples:
+              ForgotPasswordRequest:
+                value:
+                  email: john.doe@example.com
+                summary: Submit email to receive a password reset link
+                description: Submit the email address associated with your account.
+                  A reset link will be sent if the account exists. The same generic
+                  response is returned whether or not the email is registered — this
+                  prevents account enumeration.
+              ThrottledResponse:
+                value:
+                  success: false
+                  message: Too many requests. Please try again later.
+                  errors:
+                    retry_after: 42
+                summary: Rate limit exceeded
+                description: Returned when the client exceeds the configured rate
+                  limit.
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForgotPasswordSuccessResponse'
+              examples:
+                ForgotPassword—Success:
+                  value:
+                    success: true
+                    message: If an account exists, a password reset link has been
+                      sent.
+                    data: {}
+                  summary: Generic success — reset link dispatched (or silently skipped)
+                  description: Returned in all cases to prevent leaking whether the
+                    email exists.
+          description: Request processed. Reset link sent if account exists.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForgotPasswordErrorResponse'
+              examples:
+                ForgotPassword—ValidationError:
+                  value:
+                    success: false
+                    message: Request validation failed.
+                    errors:
+                      email:
+                      - Enter a valid email address.
+                  summary: Invalid email format
+                  description: Returned when the submitted email fails format validation.
+          description: Request body failed field-level validation.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThrottledErrorResponse'
+              examples:
+                ThrottledResponse:
+                  value:
+                    success: false
+                    message: Too many requests. Please try again later.
+                    errors:
+                      retry_after: 42
+                  summary: Rate limit exceeded
+                  description: Returned when the client exceeds the configured rate
+                    limit.
+          description: Returned when the client exceeds the configured rate limit
+            for this endpoint.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForgotPasswordErrorResponse'
+              examples:
+                ForgotPassword—InternalServerError:
+                  value:
+                    success: false
+                    message: Internal server error.
+                    errors: {}
+                  summary: Unexpected server-side failure
+                  description: Details are not exposed in production environments.
+          description: Unexpected internal server error.
+  /api/v1/auth/reset-password/:
+    post:
+      operationId: api_v1_auth_reset_password_create
+      description: |-
+        Consumes the signed token from the password reset email and sets a new password for the associated account.
+
+        ### Token Validity
+
+        - Tokens expire after **30 minutes**.
+        - Tokens are cryptographically signed — any tampering renders them invalid.
+
+        ### Password Policy
+
+        The new password must satisfy all enterprise policy requirements:
+
+        - Minimum length: **12 characters**
+        - At least one **uppercase** letter (A–Z)
+        - At least one **lowercase** letter (a–z)
+        - At least one **digit** (0–9)
+        - At least one **special character** (!@#$%^&* etc.)
+        - Must not be the same as the current password
+        - Must not be a commonly used password
+
+        ### Security Notes
+
+        - `password_changed_at` timestamp is updated on success.
+        - This endpoint does not require authentication.
+      summary: Reset password using a signed token
+      tags:
+      - Password Management
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequestRequest'
+            examples:
+              ResetPasswordRequest:
+                value:
+                  token: john.doe%40example.com:1sXyZa:abc123...
+                  password: NewStr0ng!Passw0rd#2025
+                  confirm_password: NewStr0ng!Passw0rd#2025
+                summary: Submit token and new password
+                description: Submit the signed token received in the reset email together
+                  with the desired new password. The token expires after 30 minutes.
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResetPasswordSuccessResponse'
+              examples:
+                ResetPassword—Success:
+                  value:
+                    success: true
+                    message: Password reset successful.
+                    data: {}
+                  summary: Password reset successfully
+                  description: Returned when the token is valid and the new password
+                    passes all policy checks.
+          description: Password reset successfully.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResetPasswordErrorResponse'
+              examples:
+                ResetPassword—InvalidOrExpiredToken:
+                  value:
+                    success: false
+                    message: Password reset link is invalid or has expired.
+                    errors: {}
+                  summary: Token is invalid, tampered with, or expired
+                  description: Returned when the signed token cannot be verified or
+                    has exceeded the 30-minute validity window.
+                ResetPassword—PasswordMismatch:
+                  value:
+                    success: false
+                    message: Passwords do not match.
+                    errors: {}
+                  summary: New password and confirmation do not match
+                ResetPassword—WeakPassword:
+                  value:
+                    success: false
+                    message: Password does not meet security requirements.
+                    errors: {}
+                  summary: New password does not satisfy the enterprise policy
+                ResetPassword—ValidationError:
+                  value:
+                    success: false
+                    message: Request validation failed.
+                    errors:
+                      token:
+                      - This field is required.
+                      password:
+                      - This field is required.
+                  summary: Request body failed field-level validation
+          description: Token invalid/expired, passwords do not match, or new password
+            fails policy checks.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResetPasswordErrorResponse'
+              examples:
+                ResetPassword—InternalServerError:
+                  value:
+                    success: false
+                    message: Internal server error.
+                    errors: {}
+                  summary: Unexpected server-side failure
+          description: Unexpected internal server error.
+  /api/v1/auth/change-password/:
+    post:
+      operationId: api_v1_auth_change_password_create
+      description: |-
+        Allows an authenticated user to change their own password.
+
+        ### Authentication
+
+        A valid **JWT Bearer token** must be supplied in the `Authorization` header:
+
+        ```
+        Authorization: Bearer <access_token>
+        ```
+
+        ### Password Policy
+
+        The new password must satisfy all enterprise policy requirements:
+
+        - Minimum length: **12 characters**
+        - At least one **uppercase** letter (A–Z)
+        - At least one **lowercase** letter (a–z)
+        - At least one **digit** (0–9)
+        - At least one **special character** (!@#$%^&* etc.)
+        - Must not be the same as the current password
+        - Must not be a commonly used password
+
+        ### Security Notes
+
+        - `password_changed_at` timestamp is updated on success.
+        - A generic error is returned for an incorrect current password to prevent timing-based enumeration.
+      summary: Change password (authenticated users only)
+      tags:
+      - Password Management
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequestRequest'
+            examples:
+              ChangePasswordRequest:
+                value:
+                  current_password: 0ldStr0ng!Passw0rd#2024
+                  new_password: NewStr0ng!Passw0rd#2025
+                  confirm_password: NewStr0ng!Passw0rd#2025
+                summary: Submit current and new password
+                description: Requires a valid JWT Bearer token in the ``Authorization``
+                  header. The current password is verified before the new password
+                  is applied.
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangePasswordSuccessResponse'
+              examples:
+                ChangePassword—Success:
+                  value:
+                    success: true
+                    message: Password changed successfully.
+                    data: {}
+                  summary: Password changed successfully
+          description: Password changed successfully.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangePasswordErrorResponse'
+              examples:
+                ChangePassword—PasswordMismatch:
+                  value:
+                    success: false
+                    message: Passwords do not match.
+                    errors: {}
+                  summary: New password and confirmation do not match
+                ChangePassword—WeakPassword:
+                  value:
+                    success: false
+                    message: Password does not meet security requirements.
+                    errors: {}
+                  summary: New password does not satisfy the enterprise policy
+                ChangePassword—ValidationError:
+                  value:
+                    success: false
+                    message: Request validation failed.
+                    errors:
+                      current_password:
+                      - This field is required.
+                      new_password:
+                      - This field is required.
+                  summary: Request body failed field-level validation
+          description: Passwords do not match or new password fails policy checks.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangePasswordErrorResponse'
+              examples:
+                ChangePassword—WrongCurrentPassword:
+                  value:
+                    success: false
+                    message: Current password is incorrect.
+                    errors: {}
+                  summary: The supplied current password is incorrect
+                ChangePassword—Unauthenticated:
+                  value:
+                    success: false
+                    message: Authentication credentials were not provided.
+                    errors:
+                      detail: Authentication credentials were not provided.
+                  summary: No valid JWT token provided
+          description: No valid JWT token provided, or current password is incorrect.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangePasswordErrorResponse'
+              examples:
+                ChangePassword—InternalServerError:
+                  value:
+                    success: false
+                    message: Internal server error.
+                    errors: {}
+                  summary: Unexpected server-side failure
+          description: Unexpected internal server error.
+  /api/v1/authorization/permissions/:
+    get:
+      operationId: api_v1_authorization_permissions_retrieve
+      description: "Retrieves a list of all registered capability permissions in the\
+        \ authorization catalog.\n\n**Required Permission**: `identity:permission:read`\
+        \  \n**Typical Roles**: `Super Administrator`, `Administrator`"
+      summary: List Permission Catalog
+      parameters:
+      - in: query
+        name: is_active
+        schema:
+          type: boolean
+        description: Filter permissions by active/disabled status.
+      tags:
+      - Permissions
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InvalidJWTAccessToken:
+                  value:
+                    detail: Given token not valid for any token type
+                    code: token_not_valid
+                    messages:
+                    - token_class: AccessToken
+                      token_type: access
+                      message: Token is invalid or expired
+                  summary: Invalid JWT Access Token
+          description: Unauthorized - Missing, expired, or invalid JWT access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InsufficientPrivilege:
+                  value:
+                    detail: You do not have permission to perform this action.
+                    required_permission: identity:role:create
+                  summary: Insufficient Privilege
+          description: Forbidden - The user is authenticated but lacks required RBAC
+            permission capabilities.
+    post:
+      operationId: api_v1_authorization_permissions_create
+      description: "Registers a new capability definition in the global Permission\
+        \ Catalog.\n\n**Required Permission**: `identity:permission:create`  \n**Typical\
+        \ Roles**: `Super Administrator`"
+      summary: Create Catalog Permission
+      tags:
+      - Permissions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PermissionCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PermissionCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PermissionCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                MalformedPayload:
+                  value:
+                    error: Invalid request payload.
+                    details:
+                      slug:
+                      - This field is required.
+                  summary: Malformed Payload
+          description: Bad Request - Invalid payload, malformed format, or bad data.
+        '401':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InvalidJWTAccessToken:
+                  value:
+                    detail: Given token not valid for any token type
+                    code: token_not_valid
+                    messages:
+                    - token_class: AccessToken
+                      token_type: access
+                      message: Token is invalid or expired
+                  summary: Invalid JWT Access Token
+          description: Unauthorized - Missing, expired, or invalid JWT access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InsufficientPrivilege:
+                  value:
+                    detail: You do not have permission to perform this action.
+                    required_permission: identity:role:create
+                  summary: Insufficient Privilege
+          description: Forbidden - The user is authenticated but lacks required RBAC
+            permission capabilities.
+        '409':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                DuplicateAssignmentMismatch:
+                  value:
+                    error: Permission 'identity:user:create' is already actively assigned
+                      to role 'admin'.
+                  summary: Duplicate Assignment Mismatch
+          description: Conflict - Uniqueness constraint violation or active duplicate
+            relationship mapping.
+        '422':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                ValidationRuleFailure:
+                  value:
+                    error: 'Invalid role attributes: {''slug'': [''Enter a valid value.'']}'
+                  summary: Validation Rule Failure
+          description: Unprocessable Entity - Semantic validator failures.
+  /api/v1/authorization/permissions/{permission_id}/:
+    get:
+      operationId: api_v1_authorization_permissions_retrieve_2
+      description: "Retrieves a single permission definition from the catalog by its\
+        \ UUID identifier.\n\n**Required Permission**: `identity:permission:read`\
+        \  \n**Typical Roles**: `Super Administrator`, `Administrator`"
+      summary: Get Permission Details
+      parameters:
+      - in: path
+        name: permission_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Permissions
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InvalidJWTAccessToken:
+                  value:
+                    detail: Given token not valid for any token type
+                    code: token_not_valid
+                    messages:
+                    - token_class: AccessToken
+                      token_type: access
+                      message: Token is invalid or expired
+                  summary: Invalid JWT Access Token
+          description: Unauthorized - Missing, expired, or invalid JWT access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InsufficientPrivilege:
+                  value:
+                    detail: You do not have permission to perform this action.
+                    required_permission: identity:role:create
+                  summary: Insufficient Privilege
+          description: Forbidden - The user is authenticated but lacks required RBAC
+            permission capabilities.
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                ResourceMissing:
+                  value:
+                    error: Role with slug 'non-existent-role' not found.
+                  summary: Resource Missing
+          description: Not Found - The requested resource does not exist in the database.
+    put:
+      operationId: api_v1_authorization_permissions_update
+      description: "Modifies the human-readable name or description of an existing\
+        \ permission definition.\n\n**Required Permission**: `identity:permission:update`\
+        \  \n**Typical Roles**: `Super Administrator`"
+      summary: Update Catalog Permission
+      parameters:
+      - in: path
+        name: permission_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Permissions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PermissionUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PermissionUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PermissionUpdateRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                MalformedPayload:
+                  value:
+                    error: Invalid request payload.
+                    details:
+                      slug:
+                      - This field is required.
+                  summary: Malformed Payload
+          description: Bad Request - Invalid payload, malformed format, or bad data.
+        '401':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InvalidJWTAccessToken:
+                  value:
+                    detail: Given token not valid for any token type
+                    code: token_not_valid
+                    messages:
+                    - token_class: AccessToken
+                      token_type: access
+                      message: Token is invalid or expired
+                  summary: Invalid JWT Access Token
+          description: Unauthorized - Missing, expired, or invalid JWT access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InsufficientPrivilege:
+                  value:
+                    detail: You do not have permission to perform this action.
+                    required_permission: identity:role:create
+                  summary: Insufficient Privilege
+          description: Forbidden - The user is authenticated but lacks required RBAC
+            permission capabilities.
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                ResourceMissing:
+                  value:
+                    error: Role with slug 'non-existent-role' not found.
+                  summary: Resource Missing
+          description: Not Found - The requested resource does not exist in the database.
+        '422':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                ValidationRuleFailure:
+                  value:
+                    error: 'Invalid role attributes: {''slug'': [''Enter a valid value.'']}'
+                  summary: Validation Rule Failure
+          description: Unprocessable Entity - Semantic validator failures.
+  /api/v1/authorization/permissions/{permission_id}/activate/:
+    post:
+      operationId: api_v1_authorization_permissions_activate_create
+      description: "Enables a deactivated permission catalog item.\n\n**Required Permission**:\
+        \ `identity:permission:update`  \n**Typical Roles**: `Super Administrator`"
+      summary: Activate Permission
+      parameters:
+      - in: path
+        name: permission_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Permissions
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InvalidJWTAccessToken:
+                  value:
+                    detail: Given token not valid for any token type
+                    code: token_not_valid
+                    messages:
+                    - token_class: AccessToken
+                      token_type: access
+                      message: Token is invalid or expired
+                  summary: Invalid JWT Access Token
+          description: Unauthorized - Missing, expired, or invalid JWT access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InsufficientPrivilege:
+                  value:
+                    detail: You do not have permission to perform this action.
+                    required_permission: identity:role:create
+                  summary: Insufficient Privilege
+          description: Forbidden - The user is authenticated but lacks required RBAC
+            permission capabilities.
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                ResourceMissing:
+                  value:
+                    error: Role with slug 'non-existent-role' not found.
+                  summary: Resource Missing
+          description: Not Found - The requested resource does not exist in the database.
+  /api/v1/authorization/permissions/{permission_id}/deactivate/:
+    post:
+      operationId: api_v1_authorization_permissions_deactivate_create
+      description: "Soft-disables a permission catalog item, temporarily disabling\
+        \ checking logic.\n\n**Required Permission**: `identity:permission:update`\
+        \  \n**Typical Roles**: `Super Administrator`"
+      summary: Deactivate Permission
+      parameters:
+      - in: path
+        name: permission_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Permissions
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InvalidJWTAccessToken:
+                  value:
+                    detail: Given token not valid for any token type
+                    code: token_not_valid
+                    messages:
+                    - token_class: AccessToken
+                      token_type: access
+                      message: Token is invalid or expired
+                  summary: Invalid JWT Access Token
+          description: Unauthorized - Missing, expired, or invalid JWT access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InsufficientPrivilege:
+                  value:
+                    detail: You do not have permission to perform this action.
+                    required_permission: identity:role:create
+                  summary: Insufficient Privilege
+          description: Forbidden - The user is authenticated but lacks required RBAC
+            permission capabilities.
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                ResourceMissing:
+                  value:
+                    error: Role with slug 'non-existent-role' not found.
+                  summary: Resource Missing
+          description: Not Found - The requested resource does not exist in the database.
+  /api/v1/authorization/roles/:
+    get:
+      operationId: api_v1_authorization_roles_retrieve
+      description: "Retrieves all defined enterprise roles.\n\n**Required Permission**:\
+        \ `identity:role:read`  \n**Typical Roles**: `Super Administrator`, `Administrator`,\
+        \ `Manager`"
+      summary: List Enterprise Roles
+      parameters:
+      - in: query
+        name: is_active
+        schema:
+          type: boolean
+        description: Filter roles by active/disabled status.
+      tags:
+      - Roles
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InvalidJWTAccessToken:
+                  value:
+                    detail: Given token not valid for any token type
+                    code: token_not_valid
+                    messages:
+                    - token_class: AccessToken
+                      token_type: access
+                      message: Token is invalid or expired
+                  summary: Invalid JWT Access Token
+          description: Unauthorized - Missing, expired, or invalid JWT access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InsufficientPrivilege:
+                  value:
+                    detail: You do not have permission to perform this action.
+                    required_permission: identity:role:create
+                  summary: Insufficient Privilege
+          description: Forbidden - The user is authenticated but lacks required RBAC
+            permission capabilities.
+    post:
+      operationId: api_v1_authorization_roles_create
+      description: "Registers a new operational enterprise role in the identity system.\n\
+        \n**Required Permission**: `identity:role:create`  \n**Typical Roles**: `Super\
+        \ Administrator`"
+      summary: Create Enterprise Role
+      tags:
+      - Roles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RoleCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RoleCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                MalformedPayload:
+                  value:
+                    error: Invalid request payload.
+                    details:
+                      slug:
+                      - This field is required.
+                  summary: Malformed Payload
+          description: Bad Request - Invalid payload, malformed format, or bad data.
+        '401':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InvalidJWTAccessToken:
+                  value:
+                    detail: Given token not valid for any token type
+                    code: token_not_valid
+                    messages:
+                    - token_class: AccessToken
+                      token_type: access
+                      message: Token is invalid or expired
+                  summary: Invalid JWT Access Token
+          description: Unauthorized - Missing, expired, or invalid JWT access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InsufficientPrivilege:
+                  value:
+                    detail: You do not have permission to perform this action.
+                    required_permission: identity:role:create
+                  summary: Insufficient Privilege
+          description: Forbidden - The user is authenticated but lacks required RBAC
+            permission capabilities.
+        '409':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                DuplicateAssignmentMismatch:
+                  value:
+                    error: Permission 'identity:user:create' is already actively assigned
+                      to role 'admin'.
+                  summary: Duplicate Assignment Mismatch
+          description: Conflict - Uniqueness constraint violation or active duplicate
+            relationship mapping.
+        '422':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                ValidationRuleFailure:
+                  value:
+                    error: 'Invalid role attributes: {''slug'': [''Enter a valid value.'']}'
+                  summary: Validation Rule Failure
+          description: Unprocessable Entity - Semantic validator failures.
+  /api/v1/authorization/roles/{role_id}/:
+    get:
+      operationId: api_v1_authorization_roles_retrieve_2
+      description: "Retrieves details of a single enterprise role by its UUID.\n\n\
+        **Required Permission**: `identity:role:read`  \n**Typical Roles**: `Super\
+        \ Administrator`, `Administrator`, `Manager`"
+      summary: Get Role Details
+      parameters:
+      - in: path
+        name: role_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Roles
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InvalidJWTAccessToken:
+                  value:
+                    detail: Given token not valid for any token type
+                    code: token_not_valid
+                    messages:
+                    - token_class: AccessToken
+                      token_type: access
+                      message: Token is invalid or expired
+                  summary: Invalid JWT Access Token
+          description: Unauthorized - Missing, expired, or invalid JWT access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InsufficientPrivilege:
+                  value:
+                    detail: You do not have permission to perform this action.
+                    required_permission: identity:role:create
+                  summary: Insufficient Privilege
+          description: Forbidden - The user is authenticated but lacks required RBAC
+            permission capabilities.
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                ResourceMissing:
+                  value:
+                    error: Role with slug 'non-existent-role' not found.
+                  summary: Resource Missing
+          description: Not Found - The requested resource does not exist in the database.
+    put:
+      operationId: api_v1_authorization_roles_update
+      description: "Modifies description, priority ranking, or details of a role.\n\
+        \n**Required Permission**: `identity:role:update`  \n**Typical Roles**: `Super\
+        \ Administrator`"
+      summary: Update Enterprise Role
+      parameters:
+      - in: path
+        name: role_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Roles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RoleUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RoleUpdateRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                MalformedPayload:
+                  value:
+                    error: Invalid request payload.
+                    details:
+                      slug:
+                      - This field is required.
+                  summary: Malformed Payload
+          description: Bad Request - Invalid payload, malformed format, or bad data.
+        '401':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InvalidJWTAccessToken:
+                  value:
+                    detail: Given token not valid for any token type
+                    code: token_not_valid
+                    messages:
+                    - token_class: AccessToken
+                      token_type: access
+                      message: Token is invalid or expired
+                  summary: Invalid JWT Access Token
+          description: Unauthorized - Missing, expired, or invalid JWT access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InsufficientPrivilege:
+                  value:
+                    detail: You do not have permission to perform this action.
+                    required_permission: identity:role:create
+                  summary: Insufficient Privilege
+          description: Forbidden - The user is authenticated but lacks required RBAC
+            permission capabilities.
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                ResourceMissing:
+                  value:
+                    error: Role with slug 'non-existent-role' not found.
+                  summary: Resource Missing
+          description: Not Found - The requested resource does not exist in the database.
+        '422':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                ValidationRuleFailure:
+                  value:
+                    error: 'Invalid role attributes: {''slug'': [''Enter a valid value.'']}'
+                  summary: Validation Rule Failure
+          description: Unprocessable Entity - Semantic validator failures.
+  /api/v1/authorization/roles/{role_id}/activate/:
+    post:
+      operationId: api_v1_authorization_roles_activate_create
+      description: "Enables a deactivated role definition.\n\n**Required Permission**:\
+        \ `identity:role:update`  \n**Typical Roles**: `Super Administrator`"
+      summary: Activate Role
+      parameters:
+      - in: path
+        name: role_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Roles
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InvalidJWTAccessToken:
+                  value:
+                    detail: Given token not valid for any token type
+                    code: token_not_valid
+                    messages:
+                    - token_class: AccessToken
+                      token_type: access
+                      message: Token is invalid or expired
+                  summary: Invalid JWT Access Token
+          description: Unauthorized - Missing, expired, or invalid JWT access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InsufficientPrivilege:
+                  value:
+                    detail: You do not have permission to perform this action.
+                    required_permission: identity:role:create
+                  summary: Insufficient Privilege
+          description: Forbidden - The user is authenticated but lacks required RBAC
+            permission capabilities.
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                ResourceMissing:
+                  value:
+                    error: Role with slug 'non-existent-role' not found.
+                  summary: Resource Missing
+          description: Not Found - The requested resource does not exist in the database.
+  /api/v1/authorization/roles/{role_id}/deactivate/:
+    post:
+      operationId: api_v1_authorization_roles_deactivate_create
+      description: "Soft-disables a role, preventing new assignments and disabling\
+        \ capabilities.\n\n**Required Permission**: `identity:role:update`  \n**Typical\
+        \ Roles**: `Super Administrator`"
+      summary: Deactivate Role
+      parameters:
+      - in: path
+        name: role_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Roles
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InvalidJWTAccessToken:
+                  value:
+                    detail: Given token not valid for any token type
+                    code: token_not_valid
+                    messages:
+                    - token_class: AccessToken
+                      token_type: access
+                      message: Token is invalid or expired
+                  summary: Invalid JWT Access Token
+          description: Unauthorized - Missing, expired, or invalid JWT access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InsufficientPrivilege:
+                  value:
+                    detail: You do not have permission to perform this action.
+                    required_permission: identity:role:create
+                  summary: Insufficient Privilege
+          description: Forbidden - The user is authenticated but lacks required RBAC
+            permission capabilities.
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                ResourceMissing:
+                  value:
+                    error: Role with slug 'non-existent-role' not found.
+                  summary: Resource Missing
+          description: Not Found - The requested resource does not exist in the database.
+  /api/v1/authorization/roles/permissions/assign/:
+    post:
+      operationId: api_v1_authorization_roles_permissions_assign_create
+      description: "Associates a capability permission from the catalog with a target\
+        \ role.\n\n**Required Permission**: `identity:role:update`  \n**Typical Roles**:\
+        \ `Super Administrator`"
+      summary: Map Permission to Role
+      tags:
+      - Role Permissions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RolePermissionAssignRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RolePermissionAssignRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RolePermissionAssignRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                MalformedPayload:
+                  value:
+                    error: Invalid request payload.
+                    details:
+                      slug:
+                      - This field is required.
+                  summary: Malformed Payload
+          description: Bad Request - Invalid payload, malformed format, or bad data.
+        '401':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InvalidJWTAccessToken:
+                  value:
+                    detail: Given token not valid for any token type
+                    code: token_not_valid
+                    messages:
+                    - token_class: AccessToken
+                      token_type: access
+                      message: Token is invalid or expired
+                  summary: Invalid JWT Access Token
+          description: Unauthorized - Missing, expired, or invalid JWT access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InsufficientPrivilege:
+                  value:
+                    detail: You do not have permission to perform this action.
+                    required_permission: identity:role:create
+                  summary: Insufficient Privilege
+          description: Forbidden - The user is authenticated but lacks required RBAC
+            permission capabilities.
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                ResourceMissing:
+                  value:
+                    error: Role with slug 'non-existent-role' not found.
+                  summary: Resource Missing
+          description: Not Found - The requested resource does not exist in the database.
+        '409':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                DuplicateAssignmentMismatch:
+                  value:
+                    error: Permission 'identity:user:create' is already actively assigned
+                      to role 'admin'.
+                  summary: Duplicate Assignment Mismatch
+          description: Conflict - Uniqueness constraint violation or active duplicate
+            relationship mapping.
+  /api/v1/authorization/roles/permissions/remove/:
+    post:
+      operationId: api_v1_authorization_roles_permissions_remove_create
+      description: "Revokes a capability permission association from a target role\
+        \ (soft clear).\n\n**Required Permission**: `identity:role:update`  \n**Typical\
+        \ Roles**: `Super Administrator`"
+      summary: Revoke Permission from Role
+      tags:
+      - Role Permissions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RolePermissionRemoveRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RolePermissionRemoveRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RolePermissionRemoveRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InvalidJWTAccessToken:
+                  value:
+                    detail: Given token not valid for any token type
+                    code: token_not_valid
+                    messages:
+                    - token_class: AccessToken
+                      token_type: access
+                      message: Token is invalid or expired
+                  summary: Invalid JWT Access Token
+          description: Unauthorized - Missing, expired, or invalid JWT access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InsufficientPrivilege:
+                  value:
+                    detail: You do not have permission to perform this action.
+                    required_permission: identity:role:create
+                  summary: Insufficient Privilege
+          description: Forbidden - The user is authenticated but lacks required RBAC
+            permission capabilities.
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                ResourceMissing:
+                  value:
+                    error: Role with slug 'non-existent-role' not found.
+                  summary: Resource Missing
+          description: Not Found - The requested resource does not exist in the database.
+  /api/v1/authorization/roles/{role_id}/permissions/:
+    get:
+      operationId: api_v1_authorization_roles_permissions_retrieve
+      description: "Retrieves all permission catalog capabilities currently mapped\
+        \ to a target role.\n\n**Required Permission**: `identity:role:read`  \n**Typical\
+        \ Roles**: `Super Administrator`, `Administrator`, `Manager`"
+      summary: List Role Permissions
+      parameters:
+      - in: query
+        name: is_active
+        schema:
+          type: boolean
+        description: Filter active/revoked mappings.
+      - in: path
+        name: role_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Role Permissions
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InvalidJWTAccessToken:
+                  value:
+                    detail: Given token not valid for any token type
+                    code: token_not_valid
+                    messages:
+                    - token_class: AccessToken
+                      token_type: access
+                      message: Token is invalid or expired
+                  summary: Invalid JWT Access Token
+          description: Unauthorized - Missing, expired, or invalid JWT access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InsufficientPrivilege:
+                  value:
+                    detail: You do not have permission to perform this action.
+                    required_permission: identity:role:create
+                  summary: Insufficient Privilege
+          description: Forbidden - The user is authenticated but lacks required RBAC
+            permission capabilities.
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                ResourceMissing:
+                  value:
+                    error: Role with slug 'non-existent-role' not found.
+                  summary: Resource Missing
+          description: Not Found - The requested resource does not exist in the database.
+  /api/v1/authorization/users/roles/assign/:
+    post:
+      operationId: api_v1_authorization_users_roles_assign_create
+      description: "Grants a security role membership to a user.\n\n**Required Permission**:\
+        \ `identity:user:update`  \n**Typical Roles**: `Super Administrator`, `Administrator`"
+      summary: Assign Role to User
+      tags:
+      - User Roles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRoleAssignRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserRoleAssignRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserRoleAssignRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                MalformedPayload:
+                  value:
+                    error: Invalid request payload.
+                    details:
+                      slug:
+                      - This field is required.
+                  summary: Malformed Payload
+          description: Bad Request - Invalid payload, malformed format, or bad data.
+        '401':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InvalidJWTAccessToken:
+                  value:
+                    detail: Given token not valid for any token type
+                    code: token_not_valid
+                    messages:
+                    - token_class: AccessToken
+                      token_type: access
+                      message: Token is invalid or expired
+                  summary: Invalid JWT Access Token
+          description: Unauthorized - Missing, expired, or invalid JWT access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InsufficientPrivilege:
+                  value:
+                    detail: You do not have permission to perform this action.
+                    required_permission: identity:role:create
+                  summary: Insufficient Privilege
+          description: Forbidden - The user is authenticated but lacks required RBAC
+            permission capabilities.
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                ResourceMissing:
+                  value:
+                    error: Role with slug 'non-existent-role' not found.
+                  summary: Resource Missing
+          description: Not Found - The requested resource does not exist in the database.
+        '409':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                DuplicateAssignmentMismatch:
+                  value:
+                    error: Permission 'identity:user:create' is already actively assigned
+                      to role 'admin'.
+                  summary: Duplicate Assignment Mismatch
+          description: Conflict - Uniqueness constraint violation or active duplicate
+            relationship mapping.
+  /api/v1/authorization/users/roles/revoke/:
+    post:
+      operationId: api_v1_authorization_users_roles_revoke_create
+      description: "Soft-deactivates a user's role assignment mapping.\n\n**Required\
+        \ Permission**: `identity:user:update`  \n**Typical Roles**: `Super Administrator`,\
+        \ `Administrator`"
+      summary: Revoke Role from User
+      tags:
+      - User Roles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRoleRevokeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserRoleRevokeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserRoleRevokeRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InvalidJWTAccessToken:
+                  value:
+                    detail: Given token not valid for any token type
+                    code: token_not_valid
+                    messages:
+                    - token_class: AccessToken
+                      token_type: access
+                      message: Token is invalid or expired
+                  summary: Invalid JWT Access Token
+          description: Unauthorized - Missing, expired, or invalid JWT access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InsufficientPrivilege:
+                  value:
+                    detail: You do not have permission to perform this action.
+                    required_permission: identity:role:create
+                  summary: Insufficient Privilege
+          description: Forbidden - The user is authenticated but lacks required RBAC
+            permission capabilities.
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                ResourceMissing:
+                  value:
+                    error: Role with slug 'non-existent-role' not found.
+                  summary: Resource Missing
+          description: Not Found - The requested resource does not exist in the database.
+  /api/v1/authorization/users/roles/extend/:
+    post:
+      operationId: api_v1_authorization_users_roles_extend_create
+      description: "Modifies the temporal expiration parameters of an active role\
+        \ assignment.\n\n**Required Permission**: `identity:user:update`  \n**Typical\
+        \ Roles**: `Super Administrator`, `Administrator`"
+      summary: Extend JIT Role Expiration
+      tags:
+      - User Roles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRoleExtendRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserRoleExtendRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserRoleExtendRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                MalformedPayload:
+                  value:
+                    error: Invalid request payload.
+                    details:
+                      slug:
+                      - This field is required.
+                  summary: Malformed Payload
+          description: Bad Request - Invalid payload, malformed format, or bad data.
+        '401':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InvalidJWTAccessToken:
+                  value:
+                    detail: Given token not valid for any token type
+                    code: token_not_valid
+                    messages:
+                    - token_class: AccessToken
+                      token_type: access
+                      message: Token is invalid or expired
+                  summary: Invalid JWT Access Token
+          description: Unauthorized - Missing, expired, or invalid JWT access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InsufficientPrivilege:
+                  value:
+                    detail: You do not have permission to perform this action.
+                    required_permission: identity:role:create
+                  summary: Insufficient Privilege
+          description: Forbidden - The user is authenticated but lacks required RBAC
+            permission capabilities.
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                ResourceMissing:
+                  value:
+                    error: Role with slug 'non-existent-role' not found.
+                  summary: Resource Missing
+          description: Not Found - The requested resource does not exist in the database.
+  /api/v1/authorization/users/{user_id}/roles/:
+    get:
+      operationId: api_v1_authorization_users_roles_retrieve
+      description: "Retrieves all roles currently mapped to a target user.\n\n**Required\
+        \ Permission**: `identity:user:read`  \n**Typical Roles**: `Super Administrator`,\
+        \ `Administrator`, `Manager`"
+      summary: List User Roles
+      parameters:
+      - in: query
+        name: is_active
+        schema:
+          type: boolean
+        description: Filter active/revoked mappings.
+      - in: path
+        name: user_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - User Roles
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InvalidJWTAccessToken:
+                  value:
+                    detail: Given token not valid for any token type
+                    code: token_not_valid
+                    messages:
+                    - token_class: AccessToken
+                      token_type: access
+                      message: Token is invalid or expired
+                  summary: Invalid JWT Access Token
+          description: Unauthorized - Missing, expired, or invalid JWT access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                InsufficientPrivilege:
+                  value:
+                    detail: You do not have permission to perform this action.
+                    required_permission: identity:role:create
+                  summary: Insufficient Privilege
+          description: Forbidden - The user is authenticated but lacks required RBAC
+            permission capabilities.
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                ResourceMissing:
+                  value:
+                    error: Role with slug 'non-existent-role' not found.
+                  summary: Resource Missing
+          description: Not Found - The requested resource does not exist in the database.
+  /api/v1/organizations/:
+    get:
+      operationId: api_v1_organizations_list
+      description: Retrieves a list of all active organizations the calling user belongs
+        to, or all organizations if the user has global read access.
+      summary: List Active Organizations
+      tags:
+      - Organizations
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrganizationDetail'
+              examples:
+                SuccessfulListing:
+                  value:
+                  - success: true
+                    message: Organizations retrieved successfully.
+                    data:
+                    - id: 11111111-1111-1111-1111-111111111111
+                      name: Alpha Corp
+                      slug: alpha-corp
+                      description: Enterprise tenant
+                      owner:
+                        id: 22222222-2222-2222-2222-222222222222
+                        email: owner@alpha.com
+                        first_name: Admin
+                        last_name: User
+                      status: ACTIVE
+                      settings:
+                        timezone: UTC
+                        country: US
+                        branding_name: Alpha Corp
+                        logo: ''
+                        session_timeout_minutes: 60
+                      created_at: '2026-07-17T12:00:00Z'
+                      updated_at: '2026-07-17T12:00:00Z'
+                  summary: Successful Listing
+                PermissionDenied:
+                  value:
+                  - success: false
+                    message: You do not have permission to perform this action.
+                    errors: {}
+                  summary: Permission Denied
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+    post:
+      operationId: api_v1_organizations_create
+      description: Creates a new organization tenant, registers the caller as the
+        owner with Administrator privileges, and bootstraps tenant settings.
+      summary: Create Organization
+      tags:
+      - Organizations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganizationCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OrganizationCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OrganizationCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationDetail'
+              examples:
+                SuccessfulCreation:
+                  value:
+                    success: true
+                    message: Organization created successfully.
+                    data:
+                      id: 11111111-1111-1111-1111-111111111111
+                      name: Alpha Corp
+                      slug: alpha-corp
+                      description: Enterprise tenant
+                      owner:
+                        id: 22222222-2222-2222-2222-222222222222
+                        email: owner@alpha.com
+                        first_name: Admin
+                        last_name: User
+                      status: ACTIVE
+                      settings:
+                        timezone: UTC
+                        country: US
+                        branding_name: Alpha Corp
+                        logo: ''
+                        session_timeout_minutes: 60
+                      created_at: '2026-07-17T12:00:00Z'
+                      updated_at: '2026-07-17T12:00:00Z'
+                  summary: Successful Creation
+                DuplicateNameError:
+                  value:
+                    success: false
+                    message: Organization with name 'Alpha Corp' already exists.
+                    errors: {}
+                  summary: Duplicate Name Error
+                ValidationFailed:
+                  value:
+                    success: false
+                    message: Operation failed.
+                    errors:
+                      name:
+                      - This field is required.
+                  summary: Validation Failed
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+  /api/v1/organizations/{id}/:
+    get:
+      operationId: api_v1_organizations_retrieve
+      description: Fetches full details of a specific organization if the user is
+        a registered member.
+      summary: Retrieve Organization
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Organizations
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationDetail'
+              examples:
+                SuccessfulRetrieval:
+                  value:
+                    success: true
+                    message: Organization retrieved successfully.
+                    data:
+                      id: 11111111-1111-1111-1111-111111111111
+                      name: Alpha Corp
+                      slug: alpha-corp
+                      description: Enterprise tenant
+                      status: ACTIVE
+                  summary: Successful Retrieval
+                OrganizationNotFound:
+                  value:
+                    success: false
+                    message: Organization not found.
+                    errors: {}
+                  summary: Organization Not Found
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+    patch:
+      operationId: api_v1_organizations_partial_update
+      description: Updates metadata parameter blocks for an organization. Requires
+        owner or workspace administrator privileges.
+      summary: Update Organization
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Organizations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedOrganizationUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedOrganizationUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedOrganizationUpdateRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationDetail'
+              examples:
+                SuccessfulUpdate:
+                  value:
+                    success: true
+                    message: Organization updated successfully.
+                    data:
+                      id: 11111111-1111-1111-1111-111111111111
+                      name: Alpha Corp (Updated)
+                      slug: alpha-corp
+                      description: New description details
+                      status: ACTIVE
+                  summary: Successful Update
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+    delete:
+      operationId: api_v1_organizations_destroy
+      description: Soft-deletes the organization tenant and revokes all active memberships.
+        Requires owner or workspace administrator privileges.
+      summary: Delete Organization
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Organizations
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+              examples:
+                SuccessfulSoftDelete:
+                  value:
+                    success: true
+                    message: Organization soft-deleted successfully.
+                    data: {}
+                  summary: Successful Soft Delete
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+  /api/v1/organizations/{id}/settings/:
+    get:
+      operationId: api_v1_organizations_settings_retrieve
+      description: Fetches current tenant configuration parameters like timezone,
+        session timeout thresholds, branding details, and logo URI.
+      summary: Retrieve Settings
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Organization Settings
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationSettingsDetail'
+              examples:
+                SuccessfulRetrieval:
+                  value:
+                    success: true
+                    message: Settings retrieved successfully.
+                    data:
+                      timezone: UTC
+                      country: US
+                      branding_name: Alpha Corp
+                      logo: https://alpha.com/logo.png
+                      session_timeout_minutes: 60
+                  summary: Successful Retrieval
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+    patch:
+      operationId: api_v1_organizations_settings_partial_update
+      description: Modifies tenant-wide settings parameters. Requires workspace admin
+        or owner status.
+      summary: Update Settings
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Organization Settings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedOrganizationSettingsUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedOrganizationSettingsUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedOrganizationSettingsUpdateRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationSettingsDetail'
+              examples:
+                SuccessfulUpdate:
+                  value:
+                    success: true
+                    message: Settings updated successfully.
+                    data:
+                      timezone: EST
+                      country: US
+                      branding_name: Alpha Premium
+                      logo: https://alpha.com/new-logo.png
+                      session_timeout_minutes: 30
+                  summary: Successful Update
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+  /api/v1/organizations/{id}/members/:
+    get:
+      operationId: api_v1_organizations_members_list
+      description: Lists all membership records for an organization. Filters by status
+        (ACTIVE, SUSPENDED, PENDING) can be passed.
+      summary: List Members
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: status
+        schema:
+          type: string
+        description: Filter memberships by state
+      tags:
+      - Organization Memberships
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrganizationMembershipDetail'
+              examples:
+                SuccessfulListing:
+                  value:
+                  - success: true
+                    message: Members retrieved successfully.
+                    data:
+                    - id: 33333333-3333-3333-3333-333333333333
+                      organization: 11111111-1111-1111-1111-111111111111
+                      user:
+                        id: 22222222-2222-2222-2222-222222222222
+                        email: employee@alpha.com
+                      role:
+                        name: Employee
+                        slug: employee
+                      status: ACTIVE
+                      joined_at: '2026-07-17T12:00:00Z'
+                  summary: Successful Listing
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+    post:
+      operationId: api_v1_organizations_members_create
+      description: Creates an active organization membership directly, bypassing invitations.
+        Requires administrative access.
+      summary: Add Member Directly
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Organization Memberships
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MembershipAddRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MembershipAddRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MembershipAddRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationMembershipDetail'
+              examples:
+                SuccessfulMemberAdd:
+                  value:
+                    success: true
+                    message: Member mapped successfully.
+                    data:
+                      id: 33333333-3333-3333-3333-333333333333
+                      organization: 11111111-1111-1111-1111-111111111111
+                      user:
+                        id: 44444444-4444-4444-4444-444444444444
+                        email: new@alpha.com
+                      role:
+                        slug: employee
+                      status: ACTIVE
+                  summary: Successful Member Add
+                MembershipAlreadyExists:
+                  value:
+                    success: false
+                    message: User is already an active member of organization.
+                    errors: {}
+                  summary: Membership Already Exists
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+  /api/v1/organizations/{id}/members/{membership_id}/role/:
+    patch:
+      operationId: api_v1_organizations_members_role_partial_update
+      description: Updates a member's assigned workspace RBAC role. Blocks demotions
+        of the primary owner membership.
+      summary: Update Member Role
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: membership_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Organization Memberships
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedMembershipRoleUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedMembershipRoleUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedMembershipRoleUpdateRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationMembershipDetail'
+              examples:
+                SuccessfulRoleChange:
+                  value:
+                    success: true
+                    message: Member role updated successfully.
+                    data:
+                      id: 33333333-3333-3333-3333-333333333333
+                      role:
+                        slug: manager
+                  summary: Successful Role Change
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+  /api/v1/organizations/{id}/members/{membership_id}/status/:
+    patch:
+      operationId: api_v1_organizations_members_status_partial_update
+      description: Changes a member's status (e.g. SUSPENDED, ACTIVE). Suspensions
+        targeting the primary owner are blocked.
+      summary: Update Member Status
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: membership_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Organization Memberships
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedMembershipStatusUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedMembershipStatusUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedMembershipStatusUpdateRequest'
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationMembershipDetail'
+              examples:
+                SuccessfulStatusUpdate:
+                  value:
+                    success: true
+                    message: Member status updated successfully.
+                    data:
+                      id: 33333333-3333-3333-3333-333333333333
+                      status: SUSPENDED
+                  summary: Successful Status Update
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+  /api/v1/organizations/{id}/members/{membership_id}/:
+    delete:
+      operationId: api_v1_organizations_members_destroy
+      description: Removes a member from the workspace roster. Rejects if attempting
+        to remove the primary tenant owner.
+      summary: Remove Member
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: membership_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Organization Memberships
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+              examples:
+                SuccessfulRemoval:
+                  value:
+                    success: true
+                    message: Member removed successfully.
+                    data: {}
+                  summary: Successful Removal
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+  /api/v1/organizations/{id}/invitations/:
+    get:
+      operationId: api_v1_organizations_invitations_list
+      description: Lists all pending recruitment invitations for the organization.
+        Requires read permissions.
+      summary: List Pending Invitations
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Organization Invitations
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrganizationInvitationDetail'
+              examples:
+                SuccessfulListing:
+                  value:
+                  - success: true
+                    message: Invitations retrieved successfully.
+                    data:
+                    - id: 55555555-5555-5555-5555-555555555555
+                      email: invitee@test.com
+                      status: PENDING
+                      expires_at: '2026-07-24T12:00:00Z'
+                  summary: Successful Listing
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+    post:
+      operationId: api_v1_organizations_invitations_create
+      description: Creates an invitation record for a user email. If the user already
+        has a system profile, maps a pending membership.
+      summary: Invite Member
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Organization Invitations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvitationCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InvitationCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InvitationCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationInvitationDetail'
+              examples:
+                SuccessfulInvite:
+                  value:
+                    success: true
+                    message: Invitation sent successfully.
+                    data:
+                      id: 55555555-5555-5555-5555-555555555555
+                      email: invitee@test.com
+                      status: PENDING
+                      expires_at: '2026-07-24T12:00:00Z'
+                  summary: Successful Invite
+                DuplicateInvitation:
+                  value:
+                    success: false
+                    message: User is already an active member of organization 'alpha-org'.
+                    errors: {}
+                  summary: Duplicate Invitation
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+  /api/v1/organizations/{id}/invitations/{invitation_id}/cancel/:
+    post:
+      operationId: api_v1_organizations_invitations_cancel_create
+      description: Cancels a pending invitation administratively, preventing future
+        acceptance. Requires admin access.
+      summary: Cancel Invitation
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: invitation_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Organization Invitations
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+              examples:
+                SuccessfulCancellation:
+                  value:
+                    success: true
+                    message: Invitation cancelled successfully.
+                    data: {}
+                  summary: Successful Cancellation
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+  /api/v1/organizations/invitations/accept/{token}/:
+    post:
+      operationId: api_v1_organizations_invitations_accept_create
+      description: Accepts a pending workspace invitation token, activating the membership.
+        Requires matching authenticated identity email.
+      summary: Accept Invitation
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+          format: uuid
+        description: Unique UUID invitation token
+        required: true
+      tags:
+      - Organization Invitations
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationMembershipDetail'
+              examples:
+                SuccessfulAccept:
+                  value:
+                    success: true
+                    message: Invitation accepted successfully.
+                    data:
+                      id: 33333333-3333-3333-3333-333333333333
+                      organization: 11111111-1111-1111-1111-111111111111
+                      status: ACTIVE
+                  summary: Successful Accept
+                ExpiredInvitationToken:
+                  value:
+                    success: false
+                    message: This invitation has expired.
+                    errors: {}
+                  summary: Expired Invitation Token
+                IdentityMismatchError:
+                  value:
+                    success: false
+                    message: Operation failed.
+                    errors:
+                      email:
+                      - This invitation was issued to a different email address.
+                  summary: Identity Mismatch Error
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+  /api/v1/organizations/invitations/reject/{token}/:
+    post:
+      operationId: api_v1_organizations_invitations_reject_create
+      description: Rejects a pending workspace invitation token, marking it permanently
+        unusable.
+      summary: Reject Invitation
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+          format: uuid
+        description: Unique UUID invitation token
+        required: true
+      tags:
+      - Organization Invitations
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+              examples:
+                SuccessfulRejection:
+                  value:
+                    success: true
+                    message: Invitation rejected successfully.
+                    data: {}
+                  summary: Successful Rejection
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+  /api/v1/organizations/{id}/transfer-ownership/:
+    post:
+      operationId: api_v1_organizations_transfer_ownership_create
+      description: Transfers primary ownership of the tenant to another active member.
+        Outgoing owner retains administrative membership access.
+      summary: Transfer Ownership
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Organization Ownership
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OwnershipTransferRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OwnershipTransferRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OwnershipTransferRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationDetail'
+              examples:
+                SuccessfulTransfer:
+                  value:
+                    success: true
+                    message: Ownership transferred successfully.
+                    data:
+                      id: 11111111-1111-1111-1111-111111111111
+                      owner:
+                        id: 44444444-4444-4444-4444-444444444444
+                        email: new_owner@alpha.com
+                  summary: Successful Transfer
+                TransferFailure(e.g.Self-transferOrSuspendedMember):
+                  value:
+                    success: false
+                    message: Cannot transfer ownership to yourself.
+                    errors: {}
+                  summary: Transfer Failure (e.g. self-transfer or suspended member)
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardErrorEnvelope'
+          description: ''
+  /api/v1/audit-logs/:
+    get:
+      operationId: api_v1_audit_logs_retrieve
+      description: |-
+        List all audit log records.
+
+        Supports:
+        - ``?search=<term>``   — search across user email, description, event type
+        - ``?status=SUCCESS``  — filter by status
+        - ``?event_type=LOGIN_SUCCESS`` — filter by event type
+        - ``?ordering=-created_at``    — custom ordering
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/audit-logs/{id}/:
+    get:
+      operationId: api_v1_audit_logs_retrieve_2
+      description: |-
+        Retrieve a single audit log entry.
+
+        Args:
+            pk: UUID string of the audit log record.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - api
+      security:
+      - jwtAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+components:
+  schemas:
+    ChangePasswordErrorResponse:
+      type: object
+      description: |-
+        Error response body for ``POST /api/v1/auth/change-password/``.
+
+        Returned for incorrect current password (401), mismatched passwords (400),
+        weak new password (400), and server errors (500).
+      properties:
+        success:
+          type: boolean
+          default: false
+          description: Always ``false`` for error responses.
+        message:
+          type: string
+          description: Human-readable description of the error.
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          default: {}
+          description: Field-level validation errors.
+      required:
+      - message
+    ChangePasswordRequestRequest:
+      type: object
+      description: Request body for ``POST /api/v1/auth/change-password/``.
+      properties:
+        current_password:
+          type: string
+          minLength: 1
+          description: The user's existing password.
+        new_password:
+          type: string
+          minLength: 1
+          description: New password satisfying the enterprise password policy.
+        confirm_password:
+          type: string
+          minLength: 1
+          description: Must match ``new_password`` exactly.
+      required:
+      - confirm_password
+      - current_password
+      - new_password
+    ChangePasswordSuccessResponse:
+      type: object
+      description: Success response body for ``POST /api/v1/auth/change-password/``.
+      properties:
+        success:
+          type: boolean
+          default: true
+          description: Indicates whether the request completed successfully.
+        message:
+          type: string
+          default: Password changed successfully.
+          description: Human-readable status message.
+        data:
+          type: object
+          additionalProperties: {}
+          default: {}
+          description: Always an empty object for this endpoint.
+    ForgotPasswordErrorResponse:
+      type: object
+      description: |-
+        Error response body for ``POST /api/v1/auth/forgot-password/``.
+
+        Returned for field validation failures (400) and server errors (500).
+      properties:
+        success:
+          type: boolean
+          default: false
+          description: Always ``false`` for error responses.
+        message:
+          type: string
+          description: Human-readable description of the error.
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          default: {}
+          description: Field-level validation errors.
+      required:
+      - message
+    ForgotPasswordRequestRequest:
+      type: object
+      description: Request body for ``POST /api/v1/auth/forgot-password/``.
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          description: Email address associated with the account.
+      required:
+      - email
+    ForgotPasswordSuccessResponse:
+      type: object
+      description: |-
+        Success response body for ``POST /api/v1/auth/forgot-password/``.
+
+        Always returned regardless of whether the email exists in the database
+        in order to prevent account enumeration.
+      properties:
+        success:
+          type: boolean
+          default: true
+          description: Indicates whether the request completed successfully.
+        message:
+          type: string
+          default: If an account exists, a password reset link has been sent.
+          description: Generic human-readable status message.
+        data:
+          type: object
+          additionalProperties: {}
+          default: {}
+          description: Always an empty object for this endpoint.
+    InvitationCreateRequest:
+      type: object
+      description: Input serializer for issuing a member invitation.
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          description: Email address of the invited user.
+        role_slug:
+          type: string
+          minLength: 1
+          default: employee
+          description: The role to assign upon token acceptance.
+          maxLength: 100
+        expires_in_days:
+          type: integer
+          minimum: 1
+          default: 7
+          description: Number of days before the token expires.
+      required:
+      - email
+    LoginData:
+      type: object
+      description: The ``data`` payload returned on successful authentication.
+      properties:
+        access:
+          type: string
+          description: 'Short-lived JWT access token (15-minute expiry). Include in
+            the ``Authorization: Bearer <token>`` header for all authenticated requests.'
+        refresh:
+          type: string
+          description: Long-lived JWT refresh token (7-day expiry). Use with ``POST
+            /api/v1/auth/token/refresh/`` to obtain a new access token without re-authenticating.
+        user:
+          allOf:
+          - $ref: '#/components/schemas/LoginUserData'
+          description: Basic profile information for the authenticated user.
+      required:
+      - access
+      - refresh
+      - user
+    LoginErrorResponse:
+      type: object
+      description: |-
+        Error response body for ``POST /api/v1/auth/login/``.
+
+        Returned for invalid credentials (401), unverified email (403),
+        inactive or locked account (403), and server errors (500).
+      properties:
+        success:
+          type: boolean
+          default: false
+          description: Always ``false`` for error responses.
+        message:
+          type: string
+          description: Human-readable description of the authentication failure.
+        errors:
+          type: object
+          additionalProperties: {}
+          default: {}
+          description: Empty for authentication failures; reserved for future use.
+      required:
+      - message
+    LoginRequest:
+      type: object
+      description: Serializer for user login.
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          maxLength: 255
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - email
+      - password
+    LoginSuccessResponse:
+      type: object
+      description: Success response body for ``POST /api/v1/auth/login/``.
+      properties:
+        success:
+          type: boolean
+          default: true
+          description: Indicates whether the request completed successfully.
+        message:
+          type: string
+          default: Login successful.
+          description: Human-readable status message.
+        data:
+          allOf:
+          - $ref: '#/components/schemas/LoginData'
+          description: Payload containing JWT tokens and authenticated user profile.
+      required:
+      - data
+    LoginUserData:
+      type: object
+      description: The nested ``user`` object returned within a successful login response.
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier of the authenticated user.
+        email:
+          type: string
+          format: email
+          description: Email address of the authenticated user.
+        first_name:
+          type: string
+          description: Given name of the authenticated user.
+        last_name:
+          type: string
+          description: Family name of the authenticated user.
+      required:
+      - email
+      - first_name
+      - id
+      - last_name
+    LogoutErrorResponse:
+      type: object
+      description: Error response body for POST /api/v1/auth/logout/
+      properties:
+        success:
+          type: boolean
+          default: false
+        message:
+          type: string
+        errors:
+          type: object
+          additionalProperties: {}
+          default: {}
+      required:
+      - message
+    LogoutRequestRequest:
+      type: object
+      description: Request body for logging out a user.
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+          description: Valid JWT refresh token to be blacklisted.
+      required:
+      - refresh
+    LogoutSuccessResponse:
+      type: object
+      description: Success response body for POST /api/v1/auth/logout/
+      properties:
+        success:
+          type: boolean
+          default: true
+        message:
+          type: string
+          default: Logout successful.
+        data:
+          type: object
+          additionalProperties: {}
+          default: {}
+          description: Always an empty object.
+    MeErrorResponse:
+      type: object
+      description: |-
+        Error response body for ``GET /api/v1/auth/me/``.
+
+        Returned when no valid JWT token is supplied (401).
+      properties:
+        success:
+          type: boolean
+          default: false
+          description: Always ``false`` for error responses.
+        message:
+          type: string
+          description: Human-readable description of the error.
+        errors:
+          type: object
+          additionalProperties: {}
+          default: {}
+          description: Detail field from the authentication layer.
+      required:
+      - message
+    MeSuccessResponse:
+      type: object
+      description: Success response body for ``GET /api/v1/auth/me/``.
+      properties:
+        success:
+          type: boolean
+          default: true
+          description: Indicates whether the request completed successfully.
+        message:
+          type: string
+          default: Profile retrieved successfully.
+          description: Human-readable status message.
+        data:
+          allOf:
+          - $ref: '#/components/schemas/MeUserData'
+          description: Authenticated user's profile data.
+      required:
+      - data
+    MeUserData:
+      type: object
+      description: The ``data`` payload returned by ``GET /api/v1/auth/me/``.
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier of the user.
+        email:
+          type: string
+          format: email
+          description: Email address of the user.
+        username:
+          type: string
+          nullable: true
+          description: Optional username.
+        first_name:
+          type: string
+          description: Given name.
+        last_name:
+          type: string
+          description: Family name.
+        full_name:
+          type: string
+          description: Computed full name (first + last).
+        is_verified:
+          type: boolean
+          description: Whether the email address has been verified.
+        is_active:
+          type: boolean
+          description: Whether the account is active.
+        created_at:
+          type: string
+          format: date-time
+          description: Account creation timestamp (ISO 8601).
+      required:
+      - created_at
+      - email
+      - first_name
+      - full_name
+      - id
+      - is_active
+      - is_verified
+      - last_name
+      - username
+    MembershipAddRequest:
+      type: object
+      description: Input serializer for adding a member directly to an organization.
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          description: Unique UUID of the User identity to map.
+        role_slug:
+          type: string
+          minLength: 1
+          description: The slug of the Role to assign.
+          maxLength: 100
+        status:
+          allOf:
+          - $ref: '#/components/schemas/Status2a0Enum'
+          default: ACTIVE
+          description: |-
+            Initial state of the membership mapping.
+
+            * `PENDING` - Pending
+            * `ACTIVE` - Active
+            * `SUSPENDED` - Suspended
+            * `REMOVED` - Removed
+      required:
+      - role_slug
+      - user_id
+    OrganizationCreateRequest:
+      type: object
+      description: Input serializer for establishing a new organization tenant.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: The human-readable name of the organization.
+          maxLength: 255
+        slug:
+          type: string
+          minLength: 1
+          description: Optional unique URL slug. Automatically generated if omitted.
+          pattern: ^[a-z0-9_-]+$
+          maxLength: 255
+        description:
+          type: string
+          default: ''
+          description: Optional summary details.
+        timezone:
+          type: string
+          minLength: 1
+          default: UTC
+          description: Regional timezone designation.
+          maxLength: 100
+        country:
+          type: string
+          default: ''
+          description: Country name or ISO regional identifier.
+          maxLength: 100
+        branding_name:
+          type: string
+          default: ''
+          description: Client-facing corporate name.
+          maxLength: 255
+        logo:
+          type: string
+          format: uri
+          default: ''
+          description: FQDN URL to corporate branding logo.
+        session_timeout_minutes:
+          type: integer
+          minimum: 1
+          default: 60
+          description: Maximum inactive session timeout before automatic logout.
+      required:
+      - name
+    OrganizationDetail:
+      type: object
+      description: Detailed read-only serializer for Organization tenant metadata.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        slug:
+          type: string
+          readOnly: true
+          pattern: ^[-a-zA-Z0-9_]+$
+        description:
+          type: string
+          readOnly: true
+        owner:
+          allOf:
+          - $ref: '#/components/schemas/UserMinimal'
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/Status2fcEnum'
+          readOnly: true
+        settings:
+          allOf:
+          - $ref: '#/components/schemas/OrganizationSettingsDetail'
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - description
+      - id
+      - name
+      - owner
+      - settings
+      - slug
+      - status
+      - updated_at
+    OrganizationInvitationDetail:
+      type: object
+      description: Detailed read-only serializer representing member recruitment invitations.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        organization:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        invited_by:
+          allOf:
+          - $ref: '#/components/schemas/UserMinimal'
+          readOnly: true
+        token:
+          type: string
+          format: uuid
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/OrganizationInvitationDetailStatusEnum'
+          readOnly: true
+        expires_at:
+          type: string
+          format: date-time
+          readOnly: true
+        accepted_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - accepted_at
+      - created_at
+      - email
+      - expires_at
+      - id
+      - invited_by
+      - organization
+      - status
+      - token
+    OrganizationInvitationDetailStatusEnum:
+      enum:
+      - PENDING
+      - ACCEPTED
+      - REJECTED
+      - EXPIRED
+      - CANCELLED
+      type: string
+      description: |-
+        * `PENDING` - Pending
+        * `ACCEPTED` - Accepted
+        * `REJECTED` - Rejected
+        * `EXPIRED` - Expired
+        * `CANCELLED` - Cancelled
+    OrganizationMembershipDetail:
+      type: object
+      description: Detailed read-only serializer mapping a User's workspace role and
+        status.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        organization:
+          type: string
+          format: uuid
+          readOnly: true
+        user:
+          allOf:
+          - $ref: '#/components/schemas/UserMinimal'
+          readOnly: true
+        role:
+          allOf:
+          - $ref: '#/components/schemas/RoleDetail'
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/Status2a0Enum'
+          readOnly: true
+        invited_by:
+          allOf:
+          - $ref: '#/components/schemas/UserMinimal'
+          readOnly: true
+        joined_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - invited_by
+      - joined_at
+      - organization
+      - role
+      - status
+      - updated_at
+      - user
+    OrganizationSettingsDetail:
+      type: object
+      description: Detailed read-only settings serializer.
+      properties:
+        timezone:
+          type: string
+          readOnly: true
+        country:
+          type: string
+          readOnly: true
+        branding_name:
+          type: string
+          readOnly: true
+        logo:
+          type: string
+          format: uri
+          readOnly: true
+        session_timeout_minutes:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - branding_name
+      - country
+      - created_at
+      - logo
+      - session_timeout_minutes
+      - timezone
+      - updated_at
+    OwnershipTransferRequest:
+      type: object
+      description: Input serializer for transferring organization ownership.
+      properties:
+        new_owner_id:
+          type: string
+          format: uuid
+          description: UUID of the active member taking ownership.
+      required:
+      - new_owner_id
+    PatchedMembershipRoleUpdateRequest:
+      type: object
+      description: Input serializer for updating a member's role assignment.
+      properties:
+        role_slug:
+          type: string
+          minLength: 1
+          description: Slug of the new Role to assign to this member.
+          maxLength: 100
+    PatchedMembershipStatusUpdateRequest:
+      type: object
+      description: Input serializer for updating a member's status configuration.
+      properties:
+        status:
+          allOf:
+          - $ref: '#/components/schemas/Status2a0Enum'
+          description: |-
+            Target status state (e.g. ACTIVE, SUSPENDED).
+
+            * `PENDING` - Pending
+            * `ACTIVE` - Active
+            * `SUSPENDED` - Suspended
+            * `REMOVED` - Removed
+    PatchedOrganizationSettingsUpdateRequest:
+      type: object
+      description: Input serializer for updating organization settings configurations.
+      properties:
+        timezone:
+          type: string
+          minLength: 1
+          description: Regional timezone (e.g. UTC, America/New_York).
+          maxLength: 100
+        country:
+          type: string
+          description: Regional country name or code.
+          maxLength: 100
+        branding_name:
+          type: string
+          description: Client-facing branding title.
+          maxLength: 255
+        logo:
+          type: string
+          format: uri
+          description: Fully qualified URL to logo image.
+        session_timeout_minutes:
+          type: integer
+          minimum: 1
+          description: Maximum session timeout duration in minutes.
+    PatchedOrganizationUpdateRequest:
+      type: object
+      description: Input serializer for updating organization metadata parameters.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: New display name of the tenant.
+          maxLength: 255
+        description:
+          type: string
+          description: New summary details.
+        status:
+          allOf:
+          - $ref: '#/components/schemas/Status2fcEnum'
+          description: |-
+            Lifecycle state adjustment.
+
+            * `ACTIVE` - Active
+            * `INACTIVE` - Inactive
+            * `SUSPENDED` - Suspended
+            * `DELETED` - Deleted
+    PermissionCreateRequest:
+      type: object
+      description: Serializer to validate payload and invoke PermissionService.create_permission.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        resource:
+          type: string
+          minLength: 1
+          pattern: ^[a-z0-9_:-]+$
+          maxLength: 100
+        action:
+          type: string
+          minLength: 1
+          pattern: ^[a-z0-9_-]+$
+          maxLength: 100
+        description:
+          type: string
+          default: ''
+      required:
+      - action
+      - name
+      - resource
+    PermissionUpdateRequest:
+      type: object
+      description: Serializer to validate payload and invoke PermissionService.update_permission.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+    RefreshTokenData:
+      type: object
+      description: Data returned after a successful refresh.
+      properties:
+        access:
+          type: string
+          description: Newly issued JWT access token.
+      required:
+      - access
+    RefreshTokenErrorResponse:
+      type: object
+      description: Error response body for POST /api/v1/auth/token/refresh/
+      properties:
+        success:
+          type: boolean
+          default: false
+        message:
+          type: string
+        errors:
+          type: object
+          additionalProperties: {}
+          default: {}
+      required:
+      - message
+    RefreshTokenRequestRequest:
+      type: object
+      description: Request body for refreshing a JWT access token.
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+          description: Valid JWT refresh token.
+      required:
+      - refresh
+    RefreshTokenSuccessResponse:
+      type: object
+      description: Success response body for POST /api/v1/auth/token/refresh/
+      properties:
+        success:
+          type: boolean
+          default: true
+        message:
+          type: string
+          default: Access token refreshed successfully.
+        data:
+          $ref: '#/components/schemas/RefreshTokenData'
+      required:
+      - data
+    RegistrationErrorResponse:
+      type: object
+      description: |-
+        Error response body for ``POST /api/v1/auth/register/``.
+
+        Returned for validation failures (400), duplicate email (409),
+        and unexpected server errors (500).
+      properties:
+        success:
+          type: boolean
+          default: false
+          description: Always ``false`` for error responses.
+        message:
+          type: string
+          description: Human-readable description of the error.
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          default: {}
+          description: Field-level validation errors. Empty for non-validation errors
+            such as duplicate email.
+      required:
+      - message
+    RegistrationRequest:
+      type: object
+      description: Serializer for user registration.
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          maxLength: 255
+        username:
+          type: string
+          maxLength: 150
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+        confirm_password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - confirm_password
+      - email
+      - password
+    RegistrationSuccessResponse:
+      type: object
+      description: Success response body for ``POST /api/v1/auth/register/``.
+      properties:
+        success:
+          type: boolean
+          default: true
+          description: Indicates whether the request completed successfully.
+        message:
+          type: string
+          default: Registration successful. Please verify your email.
+          description: Human-readable status message.
+        data:
+          allOf:
+          - $ref: '#/components/schemas/RegistrationUserData'
+          description: Payload containing the new user's identifier and email.
+      required:
+      - data
+    RegistrationUserData:
+      type: object
+      description: The ``data`` payload returned on successful registration.
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          description: Unique identifier of the newly created user account.
+        email:
+          type: string
+          format: email
+          description: Email address of the newly created user account.
+      required:
+      - email
+      - user_id
+    ResendVerificationErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          default: false
+        message:
+          type: string
+        errors:
+          type: object
+          additionalProperties: {}
+          default: {}
+      required:
+      - message
+    ResendVerificationRequestRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+      required:
+      - email
+    ResendVerificationSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          default: true
+        message:
+          type: string
+        data:
+          type: object
+          additionalProperties: {}
+          default: {}
+      required:
+      - message
+    ResetPasswordErrorResponse:
+      type: object
+      description: |-
+        Error response body for ``POST /api/v1/auth/reset-password/``.
+
+        Returned for invalid/expired tokens (400), weak passwords (400),
+        password mismatch (400), and server errors (500).
+      properties:
+        success:
+          type: boolean
+          default: false
+          description: Always ``false`` for error responses.
+        message:
+          type: string
+          description: Human-readable description of the error.
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          default: {}
+          description: Field-level validation errors.
+      required:
+      - message
+    ResetPasswordRequestRequest:
+      type: object
+      description: Request body for ``POST /api/v1/auth/reset-password/``.
+      properties:
+        token:
+          type: string
+          minLength: 1
+          description: Signed password reset token received via email.
+        password:
+          type: string
+          minLength: 1
+          description: New password satisfying the enterprise password policy.
+        confirm_password:
+          type: string
+          minLength: 1
+          description: Must match ``password`` exactly.
+      required:
+      - confirm_password
+      - password
+      - token
+    ResetPasswordSuccessResponse:
+      type: object
+      description: Success response body for ``POST /api/v1/auth/reset-password/``.
+      properties:
+        success:
+          type: boolean
+          default: true
+          description: Indicates whether the request completed successfully.
+        message:
+          type: string
+          default: Password reset successful.
+          description: Human-readable status message.
+        data:
+          type: object
+          additionalProperties: {}
+          default: {}
+          description: Always an empty object for this endpoint.
+    RoleCreateRequest:
+      type: object
+      description: Serializer to validate payload and invoke RoleService.create_role.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        slug:
+          type: string
+          minLength: 1
+          pattern: ^[a-z0-9_-]+$
+          maxLength: 100
+        description:
+          type: string
+          default: ''
+        priority:
+          type: integer
+          minimum: 0
+          default: 0
+      required:
+      - name
+      - slug
+    RoleDetail:
+      type: object
+      description: Detailed read-only serializer for Role definitions.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Unique identifier for this role.
+        name:
+          type: string
+          readOnly: true
+          description: Human-readable label for the role (e.g., Administrator, HR
+            Manager).
+        slug:
+          type: string
+          readOnly: true
+          description: URL-safe, machine-readable unique identifier for the role.
+          pattern: ^[-a-zA-Z0-9_]+$
+        description:
+          type: string
+          readOnly: true
+          nullable: true
+          description: Details about the duties, operational scope, and purpose of
+            this role.
+        priority:
+          type: integer
+          readOnly: true
+          description: Precedence ranking for administrative priority and resolution
+            purposes.
+        is_system:
+          type: boolean
+          readOnly: true
+          description: Flag indicating if this is a built-in immutable system role.
+        is_active:
+          type: boolean
+          readOnly: true
+          description: Soft-disable flag for administrative revocation without deleting
+            database records.
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Timestamp when the role was created.
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Timestamp when the role definition was last updated.
+      required:
+      - created_at
+      - description
+      - id
+      - is_active
+      - is_system
+      - name
+      - priority
+      - slug
+      - updated_at
+    RolePermissionAssignRequest:
+      type: object
+      description: Serializer to validate mapping payload and assign catalog permission
+        capability.
+      properties:
+        role_id:
+          type: string
+          format: uuid
+        permission_id:
+          type: string
+          format: uuid
+        assignment_reason:
+          type: string
+          default: ''
+      required:
+      - permission_id
+      - role_id
+    RolePermissionRemoveRequest:
+      type: object
+      description: Serializer to validate and remove permission capability mapping
+        from a target role.
+      properties:
+        role_id:
+          type: string
+          format: uuid
+        permission_id:
+          type: string
+          format: uuid
+      required:
+      - permission_id
+      - role_id
+    RoleUpdateRequest:
+      type: object
+      description: Serializer to validate payload and invoke RoleService.update_role.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+        priority:
+          type: integer
+          minimum: 0
+    StandardErrorEnvelope:
+      type: object
+      description: Standardized global error wrapper response body.
+      properties:
+        success:
+          type: boolean
+          default: false
+          description: Always false for error response paths.
+        message:
+          type: string
+          description: Status summary explanation.
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          default: {}
+          description: Dynamic dictionary mapping fields to error lists, if applicable.
+      required:
+      - message
+    Status2a0Enum:
+      enum:
+      - PENDING
+      - ACTIVE
+      - SUSPENDED
+      - REMOVED
+      type: string
+      description: |-
+        * `PENDING` - Pending
+        * `ACTIVE` - Active
+        * `SUSPENDED` - Suspended
+        * `REMOVED` - Removed
+    Status2fcEnum:
+      enum:
+      - ACTIVE
+      - INACTIVE
+      - SUSPENDED
+      - DELETED
+      type: string
+      description: |-
+        * `ACTIVE` - Active
+        * `INACTIVE` - Inactive
+        * `SUSPENDED` - Suspended
+        * `DELETED` - Deleted
+    ThrottledErrorDetails:
+      type: object
+      properties:
+        retry_after:
+          type: integer
+          description: The number of seconds to wait before retrying the request.
+      required:
+      - retry_after
+    ThrottledErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          default: false
+          description: Always ``false`` for throttled error responses.
+        message:
+          type: string
+          default: Too many requests. Please try again later.
+          description: Human-readable summary of the error.
+        errors:
+          $ref: '#/components/schemas/ThrottledErrorDetails'
+      required:
+      - errors
+    UserMinimal:
+      type: object
+      description: Compact read-only serializer for nested identity profile information.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        first_name:
+          type: string
+          readOnly: true
+        last_name:
+          type: string
+          readOnly: true
+      required:
+      - email
+      - first_name
+      - id
+      - last_name
+    UserRoleAssignRequest:
+      type: object
+      description: Serializer to grant user account role membership access.
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        role_id:
+          type: string
+          format: uuid
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        assignment_reason:
+          type: string
+          default: ''
+      required:
+      - role_id
+      - user_id
+    UserRoleExtendRequest:
+      type: object
+      description: Serializer to extend active user role assignment expiration timeline.
+      properties:
+        assignment_id:
+          type: string
+          format: uuid
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - assignment_id
+      - expires_at
+    UserRoleRevokeRequest:
+      type: object
+      description: Serializer to revoke user account role membership access.
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        role_id:
+          type: string
+          format: uuid
+      required:
+      - role_id
+      - user_id
+    VerifyEmailErrorResponse:
+      type: object
+      description: |-
+        Error response body for ``GET /api/v1/auth/verify-email/``.
+
+        Returned when the token is missing (400), invalid, or expired (400).
+      properties:
+        success:
+          type: boolean
+          default: false
+          description: Always ``false`` for error responses.
+        message:
+          type: string
+          description: Human-readable description of the error.
+        errors:
+          type: object
+          additionalProperties: {}
+          default: {}
+          description: Empty for token errors; reserved for future use.
+      required:
+      - message
+    VerifyEmailSuccessResponse:
+      type: object
+      description: Success response body for ``GET /api/v1/auth/verify-email/``.
+      properties:
+        success:
+          type: boolean
+          default: true
+          description: Indicates whether the request completed successfully.
+        message:
+          type: string
+          default: Email verified successfully.
+          description: Human-readable status message.
+        data:
+          type: object
+          additionalProperties: {}
+          default: {}
+          description: Always an empty object for this endpoint.
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+tags:
+- name: Authentication
+  description: Endpoints for registration, login, logout, email verification, and
+    token management.
+- name: Password Management
+  description: Endpoints for forgot password, password reset via token, and changing
+    password for authenticated users.
+- name: Audit Logs
+  description: Read-only audit trail of all security and domain events. Accessible
+    by staff (admin) users only.

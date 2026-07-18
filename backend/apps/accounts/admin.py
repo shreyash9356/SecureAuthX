@@ -1,5 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from .forms import CustomUserCreationForm, CustomUserChangeForm
+from apps.authorization.admin import UserRoleInline
 
 from .models import User
 
@@ -9,6 +11,9 @@ class UserAdmin(BaseUserAdmin):
     """
     Admin configuration for the custom User model.
     """
+    form = CustomUserChangeForm
+    add_form = CustomUserCreationForm
+    inlines = [UserRoleInline]
 
     list_display = (
         "email",
@@ -114,3 +119,19 @@ class UserAdmin(BaseUserAdmin):
             },
         ),
     )
+
+    def save_formset(self, request, form, formset, change):
+        """
+        Audit hook to assign the logged-in administrator to UserRole inline additions.
+        """
+        instances = formset.save(commit=False)
+        for obj in formset.deleted_objects:
+            obj.delete()
+        for instance in instances:
+            if hasattr(instance, "assigned_by") and not instance.assigned_by_id:
+                instance.assigned_by = request.user
+            instance.save()
+        formset.save_m2m()
+
+
+

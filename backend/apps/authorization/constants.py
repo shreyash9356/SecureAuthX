@@ -13,6 +13,8 @@ class RoleSlugs:
     ADMIN = "admin"
     MANAGER = "manager"
     EMPLOYEE = "employee"
+    AUDITOR = "auditor"
+    SUPPORT = "support"
 
 
 class PermissionCodes:
