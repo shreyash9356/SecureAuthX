@@ -323,24 +323,3 @@ class MFATests(APITestCase):
         )
         self.assertEqual(disable_response.status_code, status.HTTP_200_OK)
         self.assertIsNone(MFASelector.get_device_by_user(self.user))
-
-    def test_dev_qr_code_export_and_endpoint(self):
-        from apps.mfa.utils.totp import save_dev_qr_code, generate_qr_code_data_uri
-
-        dev_qr_url = reverse("mfa:mfa-dev-qr")
-
-        # 1. Non-DEBUG mode safety check
-        with self.settings(DEBUG=False):
-            self.assertIsNone(save_dev_qr_code("data:image/png;base64,1234"))
-            res = self.client.get(dev_qr_url)
-            self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
-
-        # 2. DEBUG mode export and serving test
-        with self.settings(DEBUG=True):
-            data_uri = generate_qr_code_data_uri("otpauth://totp/Test:dev@example.com?secret=JBSWY3DPEHPK3PXP")
-            file_path = save_dev_qr_code(data_uri)
-            self.assertIsNotNone(file_path)
-
-            res = self.client.get(dev_qr_url)
-            self.assertEqual(res.status_code, status.HTTP_200_OK)
-            self.assertEqual(res["Content-Type"], "image/png")

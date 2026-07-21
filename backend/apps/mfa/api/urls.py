@@ -11,7 +11,6 @@ from apps.mfa.api.views import (
     MFARecoveryCodeRegenerateAPIView,
     MFALoginVerifyAPIView,
     MFAAdminActionAPIView,
-    MFADevQRView,
 )
 
 app_name = "mfa"
@@ -36,5 +35,4 @@ urlpatterns = [
     ),
     path("verify/", MFALoginVerifyAPIView.as_view(), name="mfa-login-verify"),
     path("admin/action/", MFAAdminActionAPIView.as_view(), name="mfa-admin-action"),
-    path("dev/qr/", MFADevQRView.as_view(), name="mfa-dev-qr"),
 ]

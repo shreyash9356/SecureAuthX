@@ -3,11 +3,9 @@ TOTP utility module for RFC 6238 Multi-Factor Authentication.
 Handles secret generation, otpauth URI creation, and replay-safe OTP verification.
 """
 
-from pathlib import Path
 import base64
 import io
 import time
-from django.conf import settings
 import pyotp
 import qrcode
 
@@ -32,36 +30,6 @@ def generate_qr_code_data_uri(provisioning_uri: str) -> str:
     png_bytes = buffer.getvalue()
     base64_encoded = base64.b64encode(png_bytes).decode("utf-8")
     return f"data:image/png;base64,{base64_encoded}"
-
-
-def save_dev_qr_code(qr_data_uri: str) -> str | None:
-    """
-    Development-only utility to decode a Base64 QR Data URI and save it to disk
-    at media/dev/mfa_qr.png for easy manual scanning with authenticator apps.
-
-    Guarded by settings.DEBUG to ensure it never executes in production environments.
-    """
-    if not getattr(settings, "DEBUG", False):
-        return None
-
-    if not qr_data_uri or not qr_data_uri.startswith("data:image/png;base64,"):
-        return None
-
-    base64_str = qr_data_uri.replace("data:image/png;base64,", "")
-    png_bytes = base64.b64decode(base64_str)
-
-    media_root = getattr(settings, "MEDIA_ROOT", None)
-    if not media_root:
-        return None
-
-    dev_dir = Path(media_root) / "dev"
-    dev_dir.mkdir(parents=True, exist_ok=True)
-    file_path = dev_dir / "mfa_qr.png"
-
-    with open(file_path, "wb") as f:
-        f.write(png_bytes)
-
-    return str(file_path)
 
 
 def generate_totp_secret() -> str:

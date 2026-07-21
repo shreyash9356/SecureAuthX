@@ -2,9 +2,6 @@
 API Views for the Multi-Factor Authentication (MFA) module.
 """
 
-from django.http import HttpResponse
-from django.conf import settings
-from pathlib import Path
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied, NotFound, ValidationError
@@ -337,31 +334,3 @@ class MFAAdminActionAPIView(APIView):
             )
 
         return success_response(data={}, message=message)
-
-
-class MFADevQRView(APIView):
-    """
-    Development-only API view to serve the last generated PNG QR Code image.
-    Strictly disabled outside of DEBUG mode.
-    """
-
-    permission_classes = [AllowAny]
-
-    @extend_schema(exclude=True)
-    def get(self, request):
-        if not getattr(settings, "DEBUG", False):
-            raise NotFound("Development endpoint disabled.")
-
-        media_root = getattr(settings, "MEDIA_ROOT", None)
-        if not media_root:
-            raise NotFound("No development QR code available.")
-
-        file_path = Path(media_root) / "dev" / "mfa_qr.png"
-        if not file_path.exists():
-            raise NotFound("No development QR code available.")
-
-        with open(file_path, "rb") as f:
-            image_bytes = f.read()
-
-        return HttpResponse(image_bytes, content_type="image/png")
-

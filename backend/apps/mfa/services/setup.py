@@ -20,7 +20,6 @@ from apps.mfa.utils.totp import (
     get_totp_uri,
     verify_otp,
     generate_qr_code_data_uri,
-    save_dev_qr_code,
 )
 from apps.mfa.utils.recovery_codes import generate_recovery_codes, hash_recovery_code
 
@@ -59,9 +58,6 @@ class MFASetupService:
         # Provisioning URI and QR code generation
         provisioning_uri = get_totp_uri(raw_secret, user.email)
         qr_code = generate_qr_code_data_uri(provisioning_uri)
-
-        # Development-only export of QR code image (guarded internally by settings.DEBUG)
-        save_dev_qr_code(qr_code)
 
         # Audit log registration
         AuditLogService.log(
