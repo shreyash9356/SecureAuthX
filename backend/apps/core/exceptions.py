@@ -188,7 +188,14 @@ def _handle_auth_exception(exc: AuthenticationException) -> Response:
     ):
         http_status = status.HTTP_400_BAD_REQUEST
     else:
-        http_status = status.HTTP_400_BAD_REQUEST
+        try:
+            from apps.mfa.exceptions import MFALockoutException
+            if isinstance(exc, MFALockoutException):
+                http_status = status.HTTP_403_FORBIDDEN
+            else:
+                http_status = status.HTTP_400_BAD_REQUEST
+        except ImportError:
+            http_status = status.HTTP_400_BAD_REQUEST
 
     return _error_response(
         message=exc.message,

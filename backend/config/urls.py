@@ -43,6 +43,11 @@ urlpatterns = [
         "api/v1/sessions/",
         include("apps.user_sessions.api.urls"),
     ),
+    # MFA API
+    path(
+        "api/v1/mfa/",
+        include("apps.mfa.api.urls"),
+    ),
     # OpenAPI schema (machine-readable)
     path(
         "api/schema/",

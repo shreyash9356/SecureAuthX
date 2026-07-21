@@ -227,6 +227,32 @@ class LoginService:
                     ]
                 )
 
+            # Check if user has MFA active/enabled
+            from apps.mfa.selectors.mfa_selector import MFASelector
+            mfa_device = MFASelector.get_active_device_by_user(authenticated_user)
+
+            if mfa_device:
+                from apps.mfa.api.views import MFAPendingToken
+                mfa_token = MFAPendingToken.for_user(authenticated_user)
+
+                # Log credentials verification success (MFA required)
+                AuditLogService.log(
+                    event_type=AuditLog.EventType.LOGIN_SUCCESS,
+                    status=AuditLog.Status.SUCCESS,
+                    description="MFA required. Credentials verified successfully.",
+                    user=authenticated_user,
+                    request=request,
+                    resource="User",
+                    resource_id=str(authenticated_user.id),
+                    metadata={"mfa_required": True},
+                )
+
+                return {
+                    "mfa_required": True,
+                    "mfa_token": str(mfa_token),
+                    "user": authenticated_user,
+                }
+
             # Resolve organization context if user belongs to one
             from apps.organizations.models import OrganizationMembership
             from apps.organizations.constants import MembershipStatus

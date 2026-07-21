@@ -110,6 +110,18 @@ class LoginAPIView(APIView):
         serializer.is_valid(raise_exception=True)
         result = serializer.save()
 
+        if result.get("mfa_required"):
+            return Response(
+                success_response(
+                    message="MFA verification required to complete login.",
+                    data={
+                        "mfa_required": True,
+                        "mfa_token": result["mfa_token"],
+                    },
+                ),
+                status=status.HTTP_200_OK,
+            )
+
         return Response(
             success_response(
                 message=LOGIN_SUCCESS,
