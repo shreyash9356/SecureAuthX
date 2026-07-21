@@ -17,6 +17,7 @@ from apps.audit_logs.models import AuditLog
 from apps.audit_logs.permissions import IsAdminUser
 from apps.audit_logs.selectors import AuditLogSelector
 from apps.authentication.utils import success_response
+from apps.core.swagger import audit_log_swagger_decorator
 
 
 class AuditLogListAPIView(APIView):
@@ -36,6 +37,10 @@ class AuditLogListAPIView(APIView):
     ordering_fields = ["created_at", "event_type", "status"]
     ordering = ["-created_at"]
 
+    @audit_log_swagger_decorator(
+        summary="List Audit Logs",
+        description="Retrieve a paginated, filterable list of security and system events."
+    )
     def get(self, request) -> Response:
         """
         List all audit log records.
@@ -81,6 +86,10 @@ class AuditLogDetailAPIView(APIView):
 
     permission_classes = [IsAdminUser]
 
+    @audit_log_swagger_decorator(
+        summary="Retrieve Audit Log",
+        description="Retrieve a single audit log event by its unique ID."
+    )
     def get(self, request, pk: str) -> Response:
         """
         Retrieve a single audit log entry.

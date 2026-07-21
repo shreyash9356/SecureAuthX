@@ -33,6 +33,11 @@ urlpatterns = [
         "api/v1/audit-logs/",
         include("apps.audit_logs.api.urls"),
     ),
+    # Users API
+    path(
+        "api/v1/users/",
+        include("apps.users.api.urls"),
+    ),
     # OpenAPI schema (machine-readable)
     path(
         "api/schema/",
