@@ -32,7 +32,7 @@ info:
 paths:
   /api/v1/auth/register/:
     post:
-      operationId: api_v1_auth_register_create
+      operationId: v1_auth_register_create
       description: |-
         Creates a new user account and sends an email verification link to the supplied address.
 
@@ -97,7 +97,7 @@ paths:
               $ref: '#/components/schemas/RegistrationRequest'
         required: true
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       - {}
       responses:
@@ -181,7 +181,7 @@ paths:
           description: Unexpected internal server error.
   /api/v1/auth/me/:
     get:
-      operationId: api_v1_auth_me_retrieve
+      operationId: v1_auth_me_retrieve
       description: |-
         Returns the profile information for the currently authenticated user.
 
@@ -196,7 +196,7 @@ paths:
       tags:
       - Authentication
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -241,7 +241,7 @@ paths:
           description: No valid JWT token provided.
   /api/v1/auth/login/:
     post:
-      operationId: api_v1_auth_login_create
+      operationId: v1_auth_login_create
       description: |-
         Validates the supplied credentials and, on success, issues a short-lived **JWT access token** and a long-lived **JWT refresh token**.
 
@@ -309,7 +309,7 @@ paths:
               $ref: '#/components/schemas/LoginRequest'
         required: true
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       - {}
       responses:
@@ -440,7 +440,7 @@ paths:
           description: Unexpected internal server error.
   /api/v1/auth/logout/:
     post:
-      operationId: api_v1_auth_logout_create
+      operationId: v1_auth_logout_create
       description: |-
         Invalidates the supplied JWT refresh token by adding it to the Simple JWT blacklist.
 
@@ -466,7 +466,7 @@ paths:
               $ref: '#/components/schemas/LogoutRequestRequest'
         required: true
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       - {}
       responses:
@@ -498,7 +498,7 @@ paths:
           description: Refresh token is invalid or already blacklisted.
   /api/v1/auth/token/refresh/:
     post:
-      operationId: api_v1_auth_token_refresh_create
+      operationId: v1_auth_token_refresh_create
       description: |-
         Accepts a valid refresh token and returns a newly issued JWT access token.
 
@@ -528,7 +528,7 @@ paths:
               $ref: '#/components/schemas/RefreshTokenRequestRequest'
         required: true
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       - {}
       responses:
@@ -560,7 +560,7 @@ paths:
           description: Refresh token is invalid or expired.
   /api/v1/auth/verify-email/:
     get:
-      operationId: api_v1_auth_verify_email_retrieve
+      operationId: v1_auth_verify_email_retrieve
       description: |-
         Verifies a user's email address using the signed verification token dispatched during registration.
 
@@ -588,7 +588,7 @@ paths:
       tags:
       - Authentication
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       - {}
       responses:
@@ -633,7 +633,7 @@ paths:
           description: Token is missing, invalid, or expired.
   /api/v1/auth/resend-verification/:
     post:
-      operationId: api_v1_auth_resend_verification_create
+      operationId: v1_auth_resend_verification_create
       description: |-
         Generates and sends a new email verification link for an unverified account.
 
@@ -672,7 +672,7 @@ paths:
               $ref: '#/components/schemas/ResendVerificationRequestRequest'
         required: true
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       - {}
       responses:
@@ -724,7 +724,7 @@ paths:
             for this endpoint.
   /api/v1/auth/forgot-password/:
     post:
-      operationId: api_v1_auth_forgot_password_create
+      operationId: v1_auth_forgot_password_create
       description: |-
         Accepts an email address and dispatches a password reset link if an active, non-locked account is found.
 
@@ -775,7 +775,7 @@ paths:
               $ref: '#/components/schemas/ForgotPasswordRequestRequest'
         required: true
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       - {}
       responses:
@@ -844,7 +844,7 @@ paths:
           description: Unexpected internal server error.
   /api/v1/auth/reset-password/:
     post:
-      operationId: api_v1_auth_reset_password_create
+      operationId: v1_auth_reset_password_create
       description: |-
         Consumes the signed token from the password reset email and sets a new password for the associated account.
 
@@ -894,7 +894,7 @@ paths:
               $ref: '#/components/schemas/ResetPasswordRequestRequest'
         required: true
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       - {}
       responses:
@@ -966,7 +966,7 @@ paths:
           description: Unexpected internal server error.
   /api/v1/auth/change-password/:
     post:
-      operationId: api_v1_auth_change_password_create
+      operationId: v1_auth_change_password_create
       description: |-
         Allows an authenticated user to change their own password.
 
@@ -1020,7 +1020,7 @@ paths:
               $ref: '#/components/schemas/ChangePasswordRequestRequest'
         required: true
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -1100,10 +1100,10 @@ paths:
           description: Unexpected internal server error.
   /api/v1/authorization/permissions/:
     get:
-      operationId: api_v1_authorization_permissions_retrieve
-      description: "Retrieves a list of all registered capability permissions in the\
-        \ authorization catalog.\n\n**Required Permission**: `identity:permission:read`\
-        \  \n**Typical Roles**: `Super Administrator`, `Administrator`"
+      operationId: v1_authorization_permissions_retrieve
+      description: "Retrieves a list of all registered capability permissions in the
+        authorization catalog.\n\n**Required Permission**: `identity:permission:read`
+        \ \n**Typical Roles**: `Super Administrator`, `Administrator`"
       summary: List Permission Catalog
       parameters:
       - in: query
@@ -1114,7 +1114,7 @@ paths:
       tags:
       - Permissions
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -1156,10 +1156,10 @@ paths:
           description: Forbidden - The user is authenticated but lacks required RBAC
             permission capabilities.
     post:
-      operationId: api_v1_authorization_permissions_create
-      description: "Registers a new capability definition in the global Permission\
-        \ Catalog.\n\n**Required Permission**: `identity:permission:create`  \n**Typical\
-        \ Roles**: `Super Administrator`"
+      operationId: v1_authorization_permissions_create
+      description: "Registers a new capability definition in the global Permission
+        Catalog.\n\n**Required Permission**: `identity:permission:create`  \n**Typical
+        Roles**: `Super Administrator`"
       summary: Create Catalog Permission
       tags:
       - Permissions
@@ -1176,7 +1176,7 @@ paths:
               $ref: '#/components/schemas/PermissionCreateRequest'
         required: true
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '201':
@@ -1260,10 +1260,10 @@ paths:
           description: Unprocessable Entity - Semantic validator failures.
   /api/v1/authorization/permissions/{permission_id}/:
     get:
-      operationId: api_v1_authorization_permissions_retrieve_2
-      description: "Retrieves a single permission definition from the catalog by its\
-        \ UUID identifier.\n\n**Required Permission**: `identity:permission:read`\
-        \  \n**Typical Roles**: `Super Administrator`, `Administrator`"
+      operationId: v1_authorization_permissions_retrieve_2
+      description: "Retrieves a single permission definition from the catalog by its
+        UUID identifier.\n\n**Required Permission**: `identity:permission:read`  \n**Typical
+        Roles**: `Super Administrator`, `Administrator`"
       summary: Get Permission Details
       parameters:
       - in: path
@@ -1275,7 +1275,7 @@ paths:
       tags:
       - Permissions
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -1329,10 +1329,10 @@ paths:
                   summary: Resource Missing
           description: Not Found - The requested resource does not exist in the database.
     put:
-      operationId: api_v1_authorization_permissions_update
-      description: "Modifies the human-readable name or description of an existing\
-        \ permission definition.\n\n**Required Permission**: `identity:permission:update`\
-        \  \n**Typical Roles**: `Super Administrator`"
+      operationId: v1_authorization_permissions_update
+      description: "Modifies the human-readable name or description of an existing
+        permission definition.\n\n**Required Permission**: `identity:permission:update`
+        \ \n**Typical Roles**: `Super Administrator`"
       summary: Update Catalog Permission
       parameters:
       - in: path
@@ -1355,7 +1355,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PermissionUpdateRequest'
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -1437,9 +1437,9 @@ paths:
           description: Unprocessable Entity - Semantic validator failures.
   /api/v1/authorization/permissions/{permission_id}/activate/:
     post:
-      operationId: api_v1_authorization_permissions_activate_create
-      description: "Enables a deactivated permission catalog item.\n\n**Required Permission**:\
-        \ `identity:permission:update`  \n**Typical Roles**: `Super Administrator`"
+      operationId: v1_authorization_permissions_activate_create
+      description: "Enables a deactivated permission catalog item.\n\n**Required Permission**:
+        `identity:permission:update`  \n**Typical Roles**: `Super Administrator`"
       summary: Activate Permission
       parameters:
       - in: path
@@ -1451,7 +1451,7 @@ paths:
       tags:
       - Permissions
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -1506,10 +1506,10 @@ paths:
           description: Not Found - The requested resource does not exist in the database.
   /api/v1/authorization/permissions/{permission_id}/deactivate/:
     post:
-      operationId: api_v1_authorization_permissions_deactivate_create
-      description: "Soft-disables a permission catalog item, temporarily disabling\
-        \ checking logic.\n\n**Required Permission**: `identity:permission:update`\
-        \  \n**Typical Roles**: `Super Administrator`"
+      operationId: v1_authorization_permissions_deactivate_create
+      description: "Soft-disables a permission catalog item, temporarily disabling
+        checking logic.\n\n**Required Permission**: `identity:permission:update`  \n**Typical
+        Roles**: `Super Administrator`"
       summary: Deactivate Permission
       parameters:
       - in: path
@@ -1521,7 +1521,7 @@ paths:
       tags:
       - Permissions
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -1576,10 +1576,10 @@ paths:
           description: Not Found - The requested resource does not exist in the database.
   /api/v1/authorization/roles/:
     get:
-      operationId: api_v1_authorization_roles_retrieve
-      description: "Retrieves all defined enterprise roles.\n\n**Required Permission**:\
-        \ `identity:role:read`  \n**Typical Roles**: `Super Administrator`, `Administrator`,\
-        \ `Manager`"
+      operationId: v1_authorization_roles_retrieve
+      description: "Retrieves all defined enterprise roles.\n\n**Required Permission**:
+        `identity:role:read`  \n**Typical Roles**: `Super Administrator`, `Administrator`,
+        `Manager`"
       summary: List Enterprise Roles
       parameters:
       - in: query
@@ -1590,7 +1590,7 @@ paths:
       tags:
       - Roles
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -1632,10 +1632,9 @@ paths:
           description: Forbidden - The user is authenticated but lacks required RBAC
             permission capabilities.
     post:
-      operationId: api_v1_authorization_roles_create
-      description: "Registers a new operational enterprise role in the identity system.\n\
-        \n**Required Permission**: `identity:role:create`  \n**Typical Roles**: `Super\
-        \ Administrator`"
+      operationId: v1_authorization_roles_create
+      description: "Registers a new operational enterprise role in the identity system.\n\n**Required
+        Permission**: `identity:role:create`  \n**Typical Roles**: `Super Administrator`"
       summary: Create Enterprise Role
       tags:
       - Roles
@@ -1652,7 +1651,7 @@ paths:
               $ref: '#/components/schemas/RoleCreateRequest'
         required: true
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '201':
@@ -1736,10 +1735,10 @@ paths:
           description: Unprocessable Entity - Semantic validator failures.
   /api/v1/authorization/roles/{role_id}/:
     get:
-      operationId: api_v1_authorization_roles_retrieve_2
-      description: "Retrieves details of a single enterprise role by its UUID.\n\n\
-        **Required Permission**: `identity:role:read`  \n**Typical Roles**: `Super\
-        \ Administrator`, `Administrator`, `Manager`"
+      operationId: v1_authorization_roles_retrieve_2
+      description: "Retrieves details of a single enterprise role by its UUID.\n\n**Required
+        Permission**: `identity:role:read`  \n**Typical Roles**: `Super Administrator`,
+        `Administrator`, `Manager`"
       summary: Get Role Details
       parameters:
       - in: path
@@ -1751,7 +1750,7 @@ paths:
       tags:
       - Roles
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -1805,10 +1804,9 @@ paths:
                   summary: Resource Missing
           description: Not Found - The requested resource does not exist in the database.
     put:
-      operationId: api_v1_authorization_roles_update
-      description: "Modifies description, priority ranking, or details of a role.\n\
-        \n**Required Permission**: `identity:role:update`  \n**Typical Roles**: `Super\
-        \ Administrator`"
+      operationId: v1_authorization_roles_update
+      description: "Modifies description, priority ranking, or details of a role.\n\n**Required
+        Permission**: `identity:role:update`  \n**Typical Roles**: `Super Administrator`"
       summary: Update Enterprise Role
       parameters:
       - in: path
@@ -1831,7 +1829,7 @@ paths:
             schema:
               $ref: '#/components/schemas/RoleUpdateRequest'
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -1913,9 +1911,9 @@ paths:
           description: Unprocessable Entity - Semantic validator failures.
   /api/v1/authorization/roles/{role_id}/activate/:
     post:
-      operationId: api_v1_authorization_roles_activate_create
-      description: "Enables a deactivated role definition.\n\n**Required Permission**:\
-        \ `identity:role:update`  \n**Typical Roles**: `Super Administrator`"
+      operationId: v1_authorization_roles_activate_create
+      description: "Enables a deactivated role definition.\n\n**Required Permission**:
+        `identity:role:update`  \n**Typical Roles**: `Super Administrator`"
       summary: Activate Role
       parameters:
       - in: path
@@ -1927,7 +1925,7 @@ paths:
       tags:
       - Roles
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -1982,10 +1980,10 @@ paths:
           description: Not Found - The requested resource does not exist in the database.
   /api/v1/authorization/roles/{role_id}/deactivate/:
     post:
-      operationId: api_v1_authorization_roles_deactivate_create
-      description: "Soft-disables a role, preventing new assignments and disabling\
-        \ capabilities.\n\n**Required Permission**: `identity:role:update`  \n**Typical\
-        \ Roles**: `Super Administrator`"
+      operationId: v1_authorization_roles_deactivate_create
+      description: "Soft-disables a role, preventing new assignments and disabling
+        capabilities.\n\n**Required Permission**: `identity:role:update`  \n**Typical
+        Roles**: `Super Administrator`"
       summary: Deactivate Role
       parameters:
       - in: path
@@ -1997,7 +1995,7 @@ paths:
       tags:
       - Roles
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -2052,10 +2050,10 @@ paths:
           description: Not Found - The requested resource does not exist in the database.
   /api/v1/authorization/roles/permissions/assign/:
     post:
-      operationId: api_v1_authorization_roles_permissions_assign_create
-      description: "Associates a capability permission from the catalog with a target\
-        \ role.\n\n**Required Permission**: `identity:role:update`  \n**Typical Roles**:\
-        \ `Super Administrator`"
+      operationId: v1_authorization_roles_permissions_assign_create
+      description: "Associates a capability permission from the catalog with a target
+        role.\n\n**Required Permission**: `identity:role:update`  \n**Typical Roles**:
+        `Super Administrator`"
       summary: Map Permission to Role
       tags:
       - Role Permissions
@@ -2072,7 +2070,7 @@ paths:
               $ref: '#/components/schemas/RolePermissionAssignRequest'
         required: true
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '201':
@@ -2156,10 +2154,10 @@ paths:
             relationship mapping.
   /api/v1/authorization/roles/permissions/remove/:
     post:
-      operationId: api_v1_authorization_roles_permissions_remove_create
-      description: "Revokes a capability permission association from a target role\
-        \ (soft clear).\n\n**Required Permission**: `identity:role:update`  \n**Typical\
-        \ Roles**: `Super Administrator`"
+      operationId: v1_authorization_roles_permissions_remove_create
+      description: "Revokes a capability permission association from a target role
+        (soft clear).\n\n**Required Permission**: `identity:role:update`  \n**Typical
+        Roles**: `Super Administrator`"
       summary: Revoke Permission from Role
       tags:
       - Role Permissions
@@ -2176,7 +2174,7 @@ paths:
               $ref: '#/components/schemas/RolePermissionRemoveRequest'
         required: true
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -2231,10 +2229,10 @@ paths:
           description: Not Found - The requested resource does not exist in the database.
   /api/v1/authorization/roles/{role_id}/permissions/:
     get:
-      operationId: api_v1_authorization_roles_permissions_retrieve
-      description: "Retrieves all permission catalog capabilities currently mapped\
-        \ to a target role.\n\n**Required Permission**: `identity:role:read`  \n**Typical\
-        \ Roles**: `Super Administrator`, `Administrator`, `Manager`"
+      operationId: v1_authorization_roles_permissions_retrieve
+      description: "Retrieves all permission catalog capabilities currently mapped
+        to a target role.\n\n**Required Permission**: `identity:role:read`  \n**Typical
+        Roles**: `Super Administrator`, `Administrator`, `Manager`"
       summary: List Role Permissions
       parameters:
       - in: query
@@ -2251,7 +2249,7 @@ paths:
       tags:
       - Role Permissions
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -2306,9 +2304,9 @@ paths:
           description: Not Found - The requested resource does not exist in the database.
   /api/v1/authorization/users/roles/assign/:
     post:
-      operationId: api_v1_authorization_users_roles_assign_create
-      description: "Grants a security role membership to a user.\n\n**Required Permission**:\
-        \ `identity:user:update`  \n**Typical Roles**: `Super Administrator`, `Administrator`"
+      operationId: v1_authorization_users_roles_assign_create
+      description: "Grants a security role membership to a user.\n\n**Required Permission**:
+        `identity:user:update`  \n**Typical Roles**: `Super Administrator`, `Administrator`"
       summary: Assign Role to User
       tags:
       - User Roles
@@ -2325,7 +2323,7 @@ paths:
               $ref: '#/components/schemas/UserRoleAssignRequest'
         required: true
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '201':
@@ -2409,10 +2407,10 @@ paths:
             relationship mapping.
   /api/v1/authorization/users/roles/revoke/:
     post:
-      operationId: api_v1_authorization_users_roles_revoke_create
-      description: "Soft-deactivates a user's role assignment mapping.\n\n**Required\
-        \ Permission**: `identity:user:update`  \n**Typical Roles**: `Super Administrator`,\
-        \ `Administrator`"
+      operationId: v1_authorization_users_roles_revoke_create
+      description: "Soft-deactivates a user's role assignment mapping.\n\n**Required
+        Permission**: `identity:user:update`  \n**Typical Roles**: `Super Administrator`,
+        `Administrator`"
       summary: Revoke Role from User
       tags:
       - User Roles
@@ -2429,7 +2427,7 @@ paths:
               $ref: '#/components/schemas/UserRoleRevokeRequest'
         required: true
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -2484,10 +2482,10 @@ paths:
           description: Not Found - The requested resource does not exist in the database.
   /api/v1/authorization/users/roles/extend/:
     post:
-      operationId: api_v1_authorization_users_roles_extend_create
-      description: "Modifies the temporal expiration parameters of an active role\
-        \ assignment.\n\n**Required Permission**: `identity:user:update`  \n**Typical\
-        \ Roles**: `Super Administrator`, `Administrator`"
+      operationId: v1_authorization_users_roles_extend_create
+      description: "Modifies the temporal expiration parameters of an active role
+        assignment.\n\n**Required Permission**: `identity:user:update`  \n**Typical
+        Roles**: `Super Administrator`, `Administrator`"
       summary: Extend JIT Role Expiration
       tags:
       - User Roles
@@ -2504,7 +2502,7 @@ paths:
               $ref: '#/components/schemas/UserRoleExtendRequest'
         required: true
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -2574,10 +2572,10 @@ paths:
           description: Not Found - The requested resource does not exist in the database.
   /api/v1/authorization/users/{user_id}/roles/:
     get:
-      operationId: api_v1_authorization_users_roles_retrieve
-      description: "Retrieves all roles currently mapped to a target user.\n\n**Required\
-        \ Permission**: `identity:user:read`  \n**Typical Roles**: `Super Administrator`,\
-        \ `Administrator`, `Manager`"
+      operationId: v1_authorization_users_roles_retrieve
+      description: "Retrieves all roles currently mapped to a target user.\n\n**Required
+        Permission**: `identity:user:read`  \n**Typical Roles**: `Super Administrator`,
+        `Administrator`, `Manager`"
       summary: List User Roles
       parameters:
       - in: query
@@ -2594,7 +2592,7 @@ paths:
       tags:
       - User Roles
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -2649,14 +2647,14 @@ paths:
           description: Not Found - The requested resource does not exist in the database.
   /api/v1/organizations/:
     get:
-      operationId: api_v1_organizations_list
+      operationId: v1_organizations_list
       description: Retrieves a list of all active organizations the calling user belongs
         to, or all organizations if the user has global read access.
       summary: List Active Organizations
       tags:
       - Organizations
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -2711,7 +2709,7 @@ paths:
                 $ref: '#/components/schemas/StandardErrorEnvelope'
           description: ''
     post:
-      operationId: api_v1_organizations_create
+      operationId: v1_organizations_create
       description: Creates a new organization tenant, registers the caller as the
         owner with Administrator privileges, and bootstraps tenant settings.
       summary: Create Organization
@@ -2730,7 +2728,7 @@ paths:
               $ref: '#/components/schemas/OrganizationCreateRequest'
         required: true
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '201':
@@ -2798,7 +2796,7 @@ paths:
           description: ''
   /api/v1/organizations/{id}/:
     get:
-      operationId: api_v1_organizations_retrieve
+      operationId: v1_organizations_retrieve
       description: Fetches full details of a specific organization if the user is
         a registered member.
       summary: Retrieve Organization
@@ -2812,7 +2810,7 @@ paths:
       tags:
       - Organizations
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -2858,7 +2856,7 @@ paths:
                 $ref: '#/components/schemas/StandardErrorEnvelope'
           description: ''
     patch:
-      operationId: api_v1_organizations_partial_update
+      operationId: v1_organizations_partial_update
       description: Updates metadata parameter blocks for an organization. Requires
         owner or workspace administrator privileges.
       summary: Update Organization
@@ -2883,7 +2881,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedOrganizationUpdateRequest'
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -2923,7 +2921,7 @@ paths:
                 $ref: '#/components/schemas/StandardErrorEnvelope'
           description: ''
     delete:
-      operationId: api_v1_organizations_destroy
+      operationId: v1_organizations_destroy
       description: Soft-deletes the organization tenant and revokes all active memberships.
         Requires owner or workspace administrator privileges.
       summary: Delete Organization
@@ -2937,7 +2935,7 @@ paths:
       tags:
       - Organizations
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -2967,7 +2965,7 @@ paths:
           description: ''
   /api/v1/organizations/{id}/settings/:
     get:
-      operationId: api_v1_organizations_settings_retrieve
+      operationId: v1_organizations_settings_retrieve
       description: Fetches current tenant configuration parameters like timezone,
         session timeout thresholds, branding details, and logo URI.
       summary: Retrieve Settings
@@ -2981,7 +2979,7 @@ paths:
       tags:
       - Organization Settings
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -3015,7 +3013,7 @@ paths:
                 $ref: '#/components/schemas/StandardErrorEnvelope'
           description: ''
     patch:
-      operationId: api_v1_organizations_settings_partial_update
+      operationId: v1_organizations_settings_partial_update
       description: Modifies tenant-wide settings parameters. Requires workspace admin
         or owner status.
       summary: Update Settings
@@ -3040,7 +3038,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedOrganizationSettingsUpdateRequest'
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -3075,7 +3073,7 @@ paths:
           description: ''
   /api/v1/organizations/{id}/members/:
     get:
-      operationId: api_v1_organizations_members_list
+      operationId: v1_organizations_members_list
       description: Lists all membership records for an organization. Filters by status
         (ACTIVE, SUSPENDED, PENDING) can be passed.
       summary: List Members
@@ -3094,7 +3092,7 @@ paths:
       tags:
       - Organization Memberships
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -3129,7 +3127,7 @@ paths:
                 $ref: '#/components/schemas/StandardErrorEnvelope'
           description: ''
     post:
-      operationId: api_v1_organizations_members_create
+      operationId: v1_organizations_members_create
       description: Creates an active organization membership directly, bypassing invitations.
         Requires administrative access.
       summary: Add Member Directly
@@ -3155,7 +3153,7 @@ paths:
               $ref: '#/components/schemas/MembershipAddRequest'
         required: true
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '201':
@@ -3205,7 +3203,7 @@ paths:
           description: ''
   /api/v1/organizations/{id}/members/{membership_id}/role/:
     patch:
-      operationId: api_v1_organizations_members_role_partial_update
+      operationId: v1_organizations_members_role_partial_update
       description: Updates a member's assigned workspace RBAC role. Blocks demotions
         of the primary owner membership.
       summary: Update Member Role
@@ -3236,7 +3234,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedMembershipRoleUpdateRequest'
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -3269,7 +3267,7 @@ paths:
           description: ''
   /api/v1/organizations/{id}/members/{membership_id}/status/:
     patch:
-      operationId: api_v1_organizations_members_status_partial_update
+      operationId: v1_organizations_members_status_partial_update
       description: Changes a member's status (e.g. SUSPENDED, ACTIVE). Suspensions
         targeting the primary owner are blocked.
       summary: Update Member Status
@@ -3300,7 +3298,7 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedMembershipStatusUpdateRequest'
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -3332,7 +3330,7 @@ paths:
           description: ''
   /api/v1/organizations/{id}/members/{membership_id}/:
     delete:
-      operationId: api_v1_organizations_members_destroy
+      operationId: v1_organizations_members_destroy
       description: Removes a member from the workspace roster. Rejects if attempting
         to remove the primary tenant owner.
       summary: Remove Member
@@ -3352,7 +3350,7 @@ paths:
       tags:
       - Organization Memberships
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -3382,7 +3380,7 @@ paths:
           description: ''
   /api/v1/organizations/{id}/invitations/:
     get:
-      operationId: api_v1_organizations_invitations_list
+      operationId: v1_organizations_invitations_list
       description: Lists all pending recruitment invitations for the organization.
         Requires read permissions.
       summary: List Pending Invitations
@@ -3396,7 +3394,7 @@ paths:
       tags:
       - Organization Invitations
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -3425,7 +3423,7 @@ paths:
                 $ref: '#/components/schemas/StandardErrorEnvelope'
           description: ''
     post:
-      operationId: api_v1_organizations_invitations_create
+      operationId: v1_organizations_invitations_create
       description: Creates an invitation record for a user email. If the user already
         has a system profile, maps a pending membership.
       summary: Invite Member
@@ -3451,7 +3449,7 @@ paths:
               $ref: '#/components/schemas/InvitationCreateRequest'
         required: true
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '201':
@@ -3497,7 +3495,7 @@ paths:
           description: ''
   /api/v1/organizations/{id}/invitations/{invitation_id}/cancel/:
     post:
-      operationId: api_v1_organizations_invitations_cancel_create
+      operationId: v1_organizations_invitations_cancel_create
       description: Cancels a pending invitation administratively, preventing future
         acceptance. Requires admin access.
       summary: Cancel Invitation
@@ -3517,7 +3515,7 @@ paths:
       tags:
       - Organization Invitations
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -3547,7 +3545,7 @@ paths:
           description: ''
   /api/v1/organizations/invitations/accept/{token}/:
     post:
-      operationId: api_v1_organizations_invitations_accept_create
+      operationId: v1_organizations_invitations_accept_create
       description: Accepts a pending workspace invitation token, activating the membership.
         Requires matching authenticated identity email.
       summary: Accept Invitation
@@ -3562,7 +3560,7 @@ paths:
       tags:
       - Organization Invitations
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -3609,7 +3607,7 @@ paths:
           description: ''
   /api/v1/organizations/invitations/reject/{token}/:
     post:
-      operationId: api_v1_organizations_invitations_reject_create
+      operationId: v1_organizations_invitations_reject_create
       description: Rejects a pending workspace invitation token, marking it permanently
         unusable.
       summary: Reject Invitation
@@ -3624,7 +3622,7 @@ paths:
       tags:
       - Organization Invitations
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -3648,7 +3646,7 @@ paths:
           description: ''
   /api/v1/organizations/{id}/transfer-ownership/:
     post:
-      operationId: api_v1_organizations_transfer_ownership_create
+      operationId: v1_organizations_transfer_ownership_create
       description: Transfers primary ownership of the tenant to another active member.
         Outgoing owner retains administrative membership access.
       summary: Transfer Ownership
@@ -3674,7 +3672,7 @@ paths:
               $ref: '#/components/schemas/OwnershipTransferRequest'
         required: true
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
@@ -3714,31 +3712,22 @@ paths:
           description: ''
   /api/v1/audit-logs/:
     get:
-      operationId: api_v1_audit_logs_retrieve
-      description: |-
-        List all audit log records.
-
-        Supports:
-        - ``?search=<term>``   — search across user email, description, event type
-        - ``?status=SUCCESS``  — filter by status
-        - ``?event_type=LOGIN_SUCCESS`` — filter by event type
-        - ``?ordering=-created_at``    — custom ordering
+      operationId: v1_audit_logs_retrieve
+      description: Retrieve a paginated, filterable list of security and system events.
+      summary: List Audit Logs
       tags:
-      - api
+      - Audit Logs
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
           description: No response body
   /api/v1/audit-logs/{id}/:
     get:
-      operationId: api_v1_audit_logs_retrieve_2
-      description: |-
-        Retrieve a single audit log entry.
-
-        Args:
-            pk: UUID string of the audit log record.
+      operationId: v1_audit_logs_retrieve_2
+      description: Retrieve a single audit log event by its unique ID.
+      summary: Retrieve Audit Log
       parameters:
       - in: path
         name: id
@@ -3747,13 +3736,434 @@ paths:
           format: uuid
         required: true
       tags:
-      - api
+      - Audit Logs
       security:
-      - jwtAuth: []
+      - BearerAuth: []
       - BearerAuth: []
       responses:
         '200':
           description: No response body
+  /api/v1/users/:
+    get:
+      operationId: v1_users_retrieve
+      description: Retrieve a paginated list of users with filtering, searching, and
+        ordering.
+      summary: List Users
+      parameters:
+      - in: query
+        name: is_active
+        schema:
+          type: boolean
+        description: Filter by active status
+      - in: query
+        name: is_locked
+        schema:
+          type: boolean
+        description: Filter by account lock status
+      - in: query
+        name: is_verified
+        schema:
+          type: boolean
+        description: Filter by email verification status
+      - in: query
+        name: ordering
+        schema:
+          type: string
+        description: Sort order (e.g. email, -created_at)
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: Page number
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: Number of items per page
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Search query for email, username, or name fields
+      tags:
+      - Users
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/users/{id}/:
+    get:
+      operationId: v1_users_retrieve_2
+      description: Retrieve detailed profile information, system roles, and organization
+        memberships of a single user.
+      summary: Retrieve User Detail
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Users
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetail'
+          description: ''
+    patch:
+      operationId: v1_users_partial_update
+      description: Update profile fields (first_name, last_name, username) of a user
+        account.
+      summary: Update User Profile
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUserUpdateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUserUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUserUpdateRequest'
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetail'
+          description: ''
+  /api/v1/users/{id}/activate/:
+    post:
+      operationId: v1_users_activate_create
+      description: Administratively activate a deactivated user account.
+      summary: Activate User
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Users
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/users/{id}/deactivate/:
+    post:
+      operationId: v1_users_deactivate_create
+      description: Administratively deactivate an active user account. Prevents self-deactivation
+        and organization owner deactivation.
+      summary: Deactivate User
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Users
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/users/{id}/lock/:
+    post:
+      operationId: v1_users_lock_create
+      description: Administratively lock a user account until a specific time.
+      summary: Lock User
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLockRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserLockRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserLockRequest'
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/users/{id}/unlock/:
+    post:
+      operationId: v1_users_unlock_create
+      description: Administratively unlock a locked user account.
+      summary: Unlock User
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Users
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/users/{id}/assign-role/:
+    post:
+      operationId: v1_users_assign_role_create
+      description: Assign a global security system role to a user identity.
+      summary: Assign System Role
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRoleAssignRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserRoleAssignRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserRoleAssignRequest'
+        required: true
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/users/{id}/revoke-role/:
+    post:
+      operationId: v1_users_revoke_role_create
+      description: Revoke an actively assigned global security system role from a
+        user identity.
+      summary: Revoke System Role
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRoleRevokeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserRoleRevokeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserRoleRevokeRequest'
+        required: true
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/v1/sessions/:
+    get:
+      operationId: v1_sessions_list
+      description: Retrieve a list of active, non-expired sessions for the authenticated
+        user, or for an organization if requestor is an admin.
+      summary: List Active Sessions
+      parameters:
+      - in: query
+        name: organization_id
+        schema:
+          type: string
+        description: Filter sessions by organization context (Administrators only).
+      tags:
+      - User Sessions
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserSession'
+          description: ''
+  /api/v1/sessions/logout-current/:
+    post:
+      operationId: v1_sessions_logout_current_create
+      description: Terminate the current active session associated with the bearer
+        token.
+      summary: Logout Current Session
+      tags:
+      - User Sessions
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/sessions/logout-all/:
+    post:
+      operationId: v1_sessions_logout_all_create
+      description: Terminate all active sessions for the authenticated user, optionally
+        preserving the current request's session.
+      summary: Logout All Other Sessions
+      tags:
+      - User Sessions
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/sessions/{session_id}/:
+    get:
+      operationId: v1_sessions_retrieve
+      description: Retrieve session metadata for a specific session ID. Users can
+        only view their own sessions unless they are administrators.
+      summary: Get Session Details
+      parameters:
+      - in: path
+        name: session_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - User Sessions
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSession'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/sessions/{session_id}/revoke/:
+    post:
+      operationId: v1_sessions_revoke_create
+      description: Forcibly terminate a session. Restricted to administrators and
+        super administrators.
+      summary: Revoke User Session
+      parameters:
+      - in: path
+        name: session_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - User Sessions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionRevokeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SessionRevokeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SessionRevokeRequest'
+        required: true
+      security:
+      - BearerAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSession'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
 components:
   schemas:
     ChangePasswordErrorResponse:
@@ -3818,6 +4228,18 @@ components:
           additionalProperties: {}
           default: {}
           description: Always an empty object for this endpoint.
+    DeviceTypeEnum:
+      enum:
+      - DESKTOP
+      - MOBILE
+      - TABLET
+      - UNKNOWN
+      type: string
+      description: |-
+        * `DESKTOP` - Desktop
+        * `MOBILE` - Mobile
+        * `TABLET` - Tablet
+        * `UNKNOWN` - Unknown
     ForgotPasswordErrorResponse:
       type: object
       description: |-
@@ -4134,7 +4556,7 @@ components:
           maxLength: 100
         status:
           allOf:
-          - $ref: '#/components/schemas/Status2a0Enum'
+          - $ref: '#/components/schemas/StatusDdcEnum'
           default: ACTIVE
           description: |-
             Initial state of the membership mapping.
@@ -4182,10 +4604,13 @@ components:
           description: Client-facing corporate name.
           maxLength: 255
         logo:
-          type: string
-          format: uri
-          default: ''
           description: FQDN URL to corporate branding logo.
+          oneOf:
+          - type: string
+            format: uri
+            default: ''
+          - type: string
+            maxLength: 0
         session_timeout_minutes:
           type: integer
           minimum: 1
@@ -4217,7 +4642,7 @@ components:
           readOnly: true
         status:
           allOf:
-          - $ref: '#/components/schemas/Status2fcEnum'
+          - $ref: '#/components/schemas/Status249Enum'
           readOnly: true
         settings:
           allOf:
@@ -4329,7 +4754,7 @@ components:
           readOnly: true
         status:
           allOf:
-          - $ref: '#/components/schemas/Status2a0Enum'
+          - $ref: '#/components/schemas/StatusDdcEnum'
           readOnly: true
         invited_by:
           allOf:
@@ -4419,7 +4844,7 @@ components:
       properties:
         status:
           allOf:
-          - $ref: '#/components/schemas/Status2a0Enum'
+          - $ref: '#/components/schemas/StatusDdcEnum'
           description: |-
             Target status state (e.g. ACTIVE, SUSPENDED).
 
@@ -4445,9 +4870,12 @@ components:
           description: Client-facing branding title.
           maxLength: 255
         logo:
-          type: string
-          format: uri
           description: Fully qualified URL to logo image.
+          oneOf:
+          - type: string
+            format: uri
+          - type: string
+            maxLength: 0
         session_timeout_minutes:
           type: integer
           minimum: 1
@@ -4466,7 +4894,7 @@ components:
           description: New summary details.
         status:
           allOf:
-          - $ref: '#/components/schemas/Status2fcEnum'
+          - $ref: '#/components/schemas/Status249Enum'
           description: |-
             Lifecycle state adjustment.
 
@@ -4474,6 +4902,20 @@ components:
             * `INACTIVE` - Inactive
             * `SUSPENDED` - Suspended
             * `DELETED` - Deleted
+    PatchedUserUpdateRequest:
+      type: object
+      description: Input serializer for updating user profile fields.
+      properties:
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        username:
+          type: string
+          nullable: true
+          maxLength: 150
     PermissionCreateRequest:
       type: object
       description: Serializer to validate payload and invoke PermissionService.create_permission.
@@ -4871,6 +5313,17 @@ components:
         priority:
           type: integer
           minimum: 0
+    SessionRevokeRequest:
+      type: object
+      description: Serializer for administrative session revocation.
+      properties:
+        revocation_reason:
+          type: string
+          minLength: 1
+          description: Reason for administrative revocation of the session.
+          maxLength: 500
+      required:
+      - revocation_reason
     StandardErrorEnvelope:
       type: object
       description: Standardized global error wrapper response body.
@@ -4892,19 +5345,7 @@ components:
           description: Dynamic dictionary mapping fields to error lists, if applicable.
       required:
       - message
-    Status2a0Enum:
-      enum:
-      - PENDING
-      - ACTIVE
-      - SUSPENDED
-      - REMOVED
-      type: string
-      description: |-
-        * `PENDING` - Pending
-        * `ACTIVE` - Active
-        * `SUSPENDED` - Suspended
-        * `REMOVED` - Removed
-    Status2fcEnum:
+    Status249Enum:
       enum:
       - ACTIVE
       - INACTIVE
@@ -4916,6 +5357,18 @@ components:
         * `INACTIVE` - Inactive
         * `SUSPENDED` - Suspended
         * `DELETED` - Deleted
+    StatusDdcEnum:
+      enum:
+      - PENDING
+      - ACTIVE
+      - SUSPENDED
+      - REMOVED
+      type: string
+      description: |-
+        * `PENDING` - Pending
+        * `ACTIVE` - Active
+        * `SUSPENDED` - Suspended
+        * `REMOVED` - Removed
     ThrottledErrorDetails:
       type: object
       properties:
@@ -4939,6 +5392,84 @@ components:
           $ref: '#/components/schemas/ThrottledErrorDetails'
       required:
       - errors
+    UserDetail:
+      type: object
+      description: Serializer for detailed user view, including nested system roles
+        and organization memberships.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        username:
+          type: string
+          readOnly: true
+          nullable: true
+        first_name:
+          type: string
+          readOnly: true
+        last_name:
+          type: string
+          readOnly: true
+        full_name:
+          type: string
+          readOnly: true
+        is_active:
+          type: boolean
+          readOnly: true
+        is_verified:
+          type: boolean
+          readOnly: true
+        is_locked:
+          type: boolean
+          readOnly: true
+        locked_until:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          description: Account remains locked until this time.
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        roles:
+          type: string
+          readOnly: true
+        organizations:
+          type: string
+          readOnly: true
+      required:
+      - created_at
+      - email
+      - first_name
+      - full_name
+      - id
+      - is_active
+      - is_locked
+      - is_verified
+      - last_name
+      - locked_until
+      - organizations
+      - roles
+      - updated_at
+      - username
+    UserLockRequest:
+      type: object
+      description: Input serializer for locking a user account.
+      properties:
+        locked_until:
+          type: string
+          format: date-time
+          nullable: true
     UserMinimal:
       type: object
       description: Compact read-only serializer for nested identity profile information.
@@ -5009,6 +5540,126 @@ components:
       required:
       - role_id
       - user_id
+    UserSession:
+      type: object
+      description: Serializer for exposing UserSession details to clients.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          description: Opaque public session identifier. Exposed to clients instead
+            of internal DB surrogate keys.
+        organization:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+          description: Organization context for the session. Null for platform-level
+            (non-tenant) sessions. Supports future concurrent-session limits per tenant.
+        status:
+          allOf:
+          - $ref: '#/components/schemas/UserSessionStatusEnum'
+          readOnly: true
+          description: |-
+            Current lifecycle state of the session.
+
+            * `ACTIVE` - Active
+            * `LOGGED_OUT` - Logged Out
+            * `REVOKED` - Revoked
+            * `EXPIRED` - Expired
+        ip_address:
+          type: string
+          readOnly: true
+          nullable: true
+          description: Client IP address at login time. Extracted from X-Forwarded-For
+            or REMOTE_ADDR. Used for impossible-travel and suspicious login detection.
+        device_type:
+          allOf:
+          - $ref: '#/components/schemas/DeviceTypeEnum'
+          readOnly: true
+          description: |-
+            Broad device category derived from User-Agent (Desktop / Mobile / Tablet / Unknown).
+
+            * `DESKTOP` - Desktop
+            * `MOBILE` - Mobile
+            * `TABLET` - Tablet
+            * `UNKNOWN` - Unknown
+        browser:
+          type: string
+          readOnly: true
+          description: Browser name and major version parsed from User-Agent (e.g.
+            'Chrome 124').
+        operating_system:
+          type: string
+          readOnly: true
+          description: Operating system name parsed from User-Agent (e.g. 'Windows
+            11', 'iOS 17').
+        login_time:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Timestamp when this session was established (user authenticated
+            successfully).
+        last_activity:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Timestamp of the most recent authenticated request in this
+            session. Updated by the session middleware on every valid API call. Used
+            for sliding expiry and suspicious activity detection.
+        logout_time:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          description: Timestamp when the user explicitly logged out. Null until a
+            voluntary logout occurs. Must be non-null when status is LOGGED_OUT.
+        expires_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Hard expiry timestamp for this session, aligned with the JWT
+            refresh token lifetime. Sessions are considered EXPIRED after this point
+            regardless of activity.
+        revoked_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          description: Timestamp when an administrator forcibly revoked this session.
+            Must be non-null when status is REVOKED.
+        revocation_reason:
+          type: string
+          readOnly: true
+          description: Human-readable explanation for why the session was forcibly
+            terminated. Required for compliance audit trails when revoked by an administrator.
+      required:
+      - browser
+      - device_type
+      - expires_at
+      - id
+      - ip_address
+      - last_activity
+      - login_time
+      - logout_time
+      - operating_system
+      - organization
+      - revocation_reason
+      - revoked_at
+      - status
+    UserSessionStatusEnum:
+      enum:
+      - ACTIVE
+      - LOGGED_OUT
+      - REVOKED
+      - EXPIRED
+      type: string
+      description: |-
+        * `ACTIVE` - Active
+        * `LOGGED_OUT` - Logged Out
+        * `REVOKED` - Revoked
+        * `EXPIRED` - Expired
     VerifyEmailErrorResponse:
       type: object
       description: |-
@@ -5048,10 +5699,12 @@ components:
           default: {}
           description: Always an empty object for this endpoint.
   securitySchemes:
-    jwtAuth:
+    BearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+      description: JWT Bearer token authentication. Obtain a token via POST /api/v1/auth/login/
+        and prefix the value with 'Bearer '.
 tags:
 - name: Authentication
   description: Endpoints for registration, login, logout, email verification, and

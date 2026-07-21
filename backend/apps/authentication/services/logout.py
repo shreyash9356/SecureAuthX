@@ -37,6 +37,25 @@ class LogoutService:
 
         try:
             token = RefreshToken(refresh_token)
+            
+            # Terminate corresponding database session
+            session_id = token.get("session_id")
+            if session_id:
+                try:
+                    from apps.user_sessions.selectors.session_selector import SessionSelector
+                    from apps.user_sessions.services.session_service import SessionService
+
+                    session = SessionSelector.get_active_session_by_id(session_id)
+                    SessionService.logout_session(session)
+                except Exception as exc:
+                    # Silently handle errors so token blacklisting is not blocked
+                    import logging
+                    logging.getLogger(__name__).warning(
+                        "Logout session cleanup failed silently for session_id=%s. Error: %s",
+                        session_id,
+                        str(exc),
+                    )
+
             token.blacklist()
 
         except TokenError as exc:

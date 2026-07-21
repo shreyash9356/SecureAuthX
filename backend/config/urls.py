@@ -38,6 +38,11 @@ urlpatterns = [
         "api/v1/users/",
         include("apps.users.api.urls"),
     ),
+    # Sessions API
+    path(
+        "api/v1/sessions/",
+        include("apps.user_sessions.api.urls"),
+    ),
     # OpenAPI schema (machine-readable)
     path(
         "api/schema/",

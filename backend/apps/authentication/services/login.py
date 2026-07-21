@@ -227,7 +227,39 @@ class LoginService:
                     ]
                 )
 
+            # Resolve organization context if user belongs to one
+            from apps.organizations.models import OrganizationMembership
+            from apps.organizations.constants import MembershipStatus
+
+            membership = OrganizationMembership.objects.filter(
+                user=authenticated_user,
+                status=MembershipStatus.ACTIVE
+            ).first()
+            organization = membership.organization if membership else None
+
+            # Extract metadata and parse User-Agent
+            from apps.audit_logs.utils import get_client_ip, get_user_agent
+            from apps.user_sessions.utils import parse_user_agent
+            from apps.user_sessions.services.session_service import SessionService
+
+            user_agent = get_user_agent(request)
+            ip_address = get_client_ip(request) or "0.0.0.0"
+            device_type, browser, operating_system = parse_user_agent(user_agent)
+
+            # Create the session record
+            session = SessionService.create_session(
+                user=authenticated_user,
+                organization=organization,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                device_type=device_type,
+                browser=browser,
+                operating_system=operating_system,
+            )
+
+            # Generate refresh token and attach session_id claim
             refresh = RefreshToken.for_user(authenticated_user)
+            refresh["session_id"] = str(session.pk)
 
         AuditLogService.log(
             event_type=AuditLog.EventType.LOGIN_SUCCESS,

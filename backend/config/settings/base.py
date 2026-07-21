@@ -238,7 +238,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "apps.user_sessions.authentication.SessionJWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
@@ -307,16 +307,18 @@ SPECTACULAR_SETTINGS = {
             "BearerAuth": [],
         }
     ],
-    "SECURITY_DEFINITIONS": {
-        "BearerAuth": {
-            "type": "http",
-            "scheme": "bearer",
-            "bearerFormat": "JWT",
-            "description": (
-                "JWT Bearer token authentication. "
-                "Obtain a token via POST /api/v1/auth/login/ "
-                "and prefix the value with 'Bearer '."
-            ),
+    "APPEND_COMPONENTS": {
+        "securitySchemes": {
+            "BearerAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "JWT",
+                "description": (
+                    "JWT Bearer token authentication. "
+                    "Obtain a token via POST /api/v1/auth/login/ "
+                    "and prefix the value with 'Bearer '."
+                ),
+            }
         }
     },
     # ── Schema Generation ─────────────────────────────────────────────────────
