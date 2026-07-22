@@ -53,6 +53,11 @@ urlpatterns = [
         "api/v1/notifications/",
         include("apps.notifications.api.urls"),
     ),
+    # Security Policies API
+    path(
+        "api/v1/security-policies/",
+        include("apps.security_policies.api.urls"),
+    ),
     # OpenAPI schema (machine-readable)
     path(
         "api/schema/",

@@ -63,6 +63,7 @@ LOCAL_APPS = [
     "apps.mfa",
     "apps.audit_logs",
     "apps.notifications",
+    "apps.security_policies",
     "apps.common",
     "apps.core",
 ]
