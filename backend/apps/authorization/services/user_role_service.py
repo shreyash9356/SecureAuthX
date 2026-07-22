@@ -5,6 +5,8 @@ from django.db import transaction, models
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
+from apps.audit_logs.models import AuditLog
+from apps.audit_logs.services import AuditLogService
 from apps.authorization.models import Role, UserRole
 from apps.authorization.exceptions import (
     RoleNotFoundException,
@@ -34,11 +36,6 @@ class UserRoleService:
     ) -> UserRole:
         """
         Assigns a security Role to a User.
-        
-        Enforces constraints:
-        1. Both user and role must exist.
-        2. Target role must be active.
-        3. Prevent duplicate active role assignments.
         """
         User = get_user_model()
         try:
@@ -58,7 +55,6 @@ class UserRoleService:
 
         try:
             with transaction.atomic():
-                # Check for existing active mapping
                 existing = UserRole.objects.filter(
                     user=user,
                     role=role,
@@ -66,7 +62,6 @@ class UserRoleService:
                 ).first()
 
                 if existing:
-                    # If the existing assignment is already expired, mark it inactive and allow new assignment
                     if existing.expires_at and existing.expires_at <= now:
                         existing.is_active = False
                         existing.save()
@@ -84,19 +79,20 @@ class UserRoleService:
                     is_active=True
                 )
                 
-                # To bypass clean()'s expires_at future validation if we want to run it dynamically
                 assignment.full_clean()
                 assignment.save()
 
                 logger.info("Successfully assigned role %s to User %s", role.slug, user.email)
 
-                # TODO: Trigger AuditLogService call in a later phase.
-                # AuditLogService.log_role_assigned(
-                #     user_id=user.id,
-                #     role_id=role.id,
-                #     actor=assigned_by_user,
-                #     expires_at=expires_at
-                # )
+                AuditLogService.log(
+                    event_type=AuditLog.EventType.ROLE_ASSIGNED,
+                    status=AuditLog.Status.SUCCESS,
+                    description=f"Role {role.slug} assigned to user {user.email}.",
+                    user=assigned_by_user,
+                    resource="UserRole",
+                    resource_id=str(assignment.id),
+                    metadata={"target_user_id": str(user.id), "role_slug": role.slug, "expires_at": str(expires_at) if expires_at else None},
+                )
 
                 return assignment
 
@@ -105,12 +101,11 @@ class UserRoleService:
             raise RoleAssignmentException(f"Invalid assignment attributes: {e.message_dict}")
 
     @classmethod
-    def revoke_role(cls, *, user_id: str, role_id: str) -> UserRole:
+    def revoke_role(cls, *, user_id: str, role_id: str, actor=None) -> UserRole:
         """
         Revokes a user's role assignment by soft-deactivating it.
         """
         try:
-            # Optimize Query: Select role to prevent N+1 scans
             assignment = UserRole.objects.select_related("role", "user").get(
                 user_id=user_id,
                 role_id=role_id,
@@ -128,8 +123,15 @@ class UserRoleService:
 
                 logger.warning("Revoked role %s from User %s", assignment.role.slug, assignment.user.email)
 
-                # TODO: Trigger AuditLogService call in a later phase.
-                # AuditLogService.log_role_revoked(user_id=user_id, role_id=role_id)
+                AuditLogService.log(
+                    event_type=AuditLog.EventType.ROLE_REMOVED,
+                    status=AuditLog.Status.SUCCESS,
+                    description=f"Role {assignment.role.slug} revoked from user {assignment.user.email}.",
+                    user=actor,
+                    resource="UserRole",
+                    resource_id=str(assignment.id),
+                    metadata={"target_user_id": str(user_id), "role_slug": assignment.role.slug},
+                )
 
                 return assignment
         except ValidationError as e:

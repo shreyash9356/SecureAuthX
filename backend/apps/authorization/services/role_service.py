@@ -3,6 +3,8 @@ from django.db import transaction, IntegrityError
 from django.core.exceptions import ValidationError
 from django.db.models import QuerySet
 
+from apps.audit_logs.models import AuditLog
+from apps.audit_logs.services import AuditLogService
 from apps.authorization.models import Role, Permission, RolePermission
 from apps.authorization.exceptions import (
     RoleNotFoundException,
@@ -36,7 +38,8 @@ class RoleService:
         slug: str,
         description: str = "",
         priority: int = 0,
-        is_system: bool = False
+        is_system: bool = False,
+        actor=None
     ) -> Role:
         """
         Creates and registers a new Role in the authorization system.
@@ -62,12 +65,15 @@ class RoleService:
 
                 logger.info("Successfully created Role: %s (Slug: %s)", name, slug)
 
-                # TODO: Trigger AuditLogService call in a later phase.
-                # AuditLogService.log_role_created(
-                #     role_id=role.id,
-                #     slug=role.slug,
-                #     details={"name": name, "priority": priority}
-                # )
+                AuditLogService.log(
+                    event_type=AuditLog.EventType.ROLE_CREATED,
+                    status=AuditLog.Status.SUCCESS,
+                    description=f"Role {name} ({slug}) created.",
+                    user=actor,
+                    resource="Role",
+                    resource_id=str(role.id),
+                    metadata={"slug": role.slug, "is_system": is_system, "priority": priority},
+                )
 
                 return role
                 
@@ -86,26 +92,23 @@ class RoleService:
         name: str = None,
         description: str = None,
         priority: int = None,
+        actor=None,
         **kwargs
     ) -> Role:
         """
         Updates fields of an existing Role.
-        
-        Enforces system role immutability and core read-only attributes.
         """
         try:
             role = Role.objects.get(id=role_id)
         except Role.DoesNotExist:
             raise RoleNotFoundException(f"Role with ID '{role_id}' not found.")
 
-        # System Role Guard
         if role.is_system:
             if name is not None and name.strip() != role.name:
                 raise SystemRoleModificationException(
                     f"System role '{role.slug}' cannot be renamed."
                 )
 
-        # Core system fields (slug, is_system) are immutable
         immutable_fields = ["slug", "is_system"]
         for field in immutable_fields:
             if field in kwargs:
@@ -127,8 +130,15 @@ class RoleService:
 
                 logger.info("Successfully updated Role: %s", role.slug)
 
-                # TODO: Trigger AuditLogService call in a later phase.
-                # AuditLogService.log_role_updated(role_id=role.id, slug=role.slug)
+                AuditLogService.log(
+                    event_type=AuditLog.EventType.ROLE_UPDATED,
+                    status=AuditLog.Status.SUCCESS,
+                    description=f"Role {role.slug} updated.",
+                    user=actor,
+                    resource="Role",
+                    resource_id=str(role.id),
+                    metadata={"slug": role.slug},
+                )
 
                 return role
                 
@@ -137,7 +147,7 @@ class RoleService:
             raise InvalidRoleException(f"Invalid role updates: {e.message_dict}")
 
     @classmethod
-    def activate_role(cls, role_id: str) -> Role:
+    def activate_role(cls, role_id: str, actor=None) -> Role:
         """
         Activates a deactivated Role.
         """
@@ -153,19 +163,24 @@ class RoleService:
 
                 logger.info("Activated Role: %s", role.slug)
 
-                # TODO: Trigger AuditLogService call in a later phase.
-                # AuditLogService.log_role_activated(role_id=role.id, slug=role.slug)
+                AuditLogService.log(
+                    event_type=AuditLog.EventType.ROLE_UPDATED,
+                    status=AuditLog.Status.SUCCESS,
+                    description=f"Role {role.slug} activated.",
+                    user=actor,
+                    resource="Role",
+                    resource_id=str(role.id),
+                    metadata={"slug": role.slug},
+                )
 
                 return role
         except ValidationError as e:
             raise InvalidRoleException(f"Validation failed: {e.message_dict}")
 
     @classmethod
-    def deactivate_role(cls, role_id: str) -> Role:
+    def deactivate_role(cls, role_id: str, actor=None) -> Role:
         """
         Deactivates a Role definition.
-        
-        System roles are essential for authorization and cannot be deactivated.
         """
         try:
             role = Role.objects.get(id=role_id)
@@ -184,21 +199,26 @@ class RoleService:
 
                 logger.warning("Deactivated Role: %s", role.slug)
 
-                # TODO: Trigger AuditLogService call in a later phase.
-                # AuditLogService.log_role_deactivated(role_id=role.id, slug=role.slug)
+                AuditLogService.log(
+                    event_type=AuditLog.EventType.ROLE_DELETED,
+                    status=AuditLog.Status.SUCCESS,
+                    description=f"Role {role.slug} deactivated.",
+                    user=actor,
+                    resource="Role",
+                    resource_id=str(role.id),
+                    metadata={"slug": role.slug},
+                )
 
                 return role
         except ValidationError as e:
             raise InvalidRoleException(f"Validation failed: {e.message_dict}")
 
     @classmethod
-    def soft_delete_role(cls, role_id: str) -> Role:
+    def soft_delete_role(cls, role_id: str, actor=None) -> Role:
         """
         Deletes a role from the catalog (soft-delete only).
-        
-        System roles are immutable and cannot be deleted.
         """
-        return cls.deactivate_role(role_id)
+        return cls.deactivate_role(role_id, actor=actor)
 
     @classmethod
     def get_role(cls, role_id: str) -> Role:
@@ -251,10 +271,6 @@ class RoleService:
     ) -> RolePermission:
         """
         Maps a permission catalog capability to a specific job Role.
-        
-        Enforces constraints:
-        1. Both role and permission must be active.
-        2. Duplicate active mappings are prohibited.
         """
         try:
             role = Role.objects.get(id=role_id)
@@ -266,7 +282,6 @@ class RoleService:
         except Permission.DoesNotExist:
             raise PermissionNotFoundException(f"Permission with ID '{permission_id}' not found in catalog.")
 
-        # Business Rules checks
         if not role.is_active:
             raise PermissionAssignmentException(
                 f"Cannot map permission to Role '{role.slug}' because the role is inactive."
@@ -279,7 +294,6 @@ class RoleService:
 
         try:
             with transaction.atomic():
-                # Check for existing mapping (active or inactive)
                 mapping, created = RolePermission.objects.get_or_create(
                     role=role,
                     permission=permission,
@@ -295,7 +309,6 @@ class RoleService:
                         raise PermissionAssignmentException(
                             f"Permission '{permission.code}' is already actively assigned to role '{role.slug}'."
                         )
-                    # Reactivate soft-disabled mapping
                     mapping.is_active = True
                     mapping.assigned_by = assigned_by_user
                     mapping.assignment_reason = assignment_reason
@@ -303,12 +316,15 @@ class RoleService:
 
                 logger.info("Mapped capability %s to Role %s", permission.code, role.slug)
 
-                # TODO: Trigger AuditLogService call in a later phase.
-                # AuditLogService.log_permission_assigned(
-                #     role_id=role.id,
-                #     permission_id=permission.id,
-                #     actor=assigned_by_user
-                # )
+                AuditLogService.log(
+                    event_type=AuditLog.EventType.PERMISSION_ASSIGNED,
+                    status=AuditLog.Status.SUCCESS,
+                    description=f"Permission {permission.code} assigned to role {role.slug}.",
+                    user=assigned_by_user,
+                    resource="RolePermission",
+                    resource_id=str(mapping.id),
+                    metadata={"role_slug": role.slug, "permission_code": permission.code},
+                )
 
                 return mapping
 
@@ -316,12 +332,11 @@ class RoleService:
             raise PermissionAssignmentException(f"Validation failed during assignment: {e.message_dict}")
 
     @classmethod
-    def remove_permission(cls, role_id: str, permission_id: str) -> RolePermission:
+    def remove_permission(cls, role_id: str, permission_id: str, actor=None) -> RolePermission:
         """
         Revokes a permission mapping from a Role (soft-deactivation).
         """
         try:
-            # Optimize Query: Pre-fetch related role and permission to avoid N+1 scans during checks and logs
             mapping = RolePermission.objects.select_related("role", "permission").get(
                 role_id=role_id,
                 permission_id=permission_id
@@ -338,11 +353,15 @@ class RoleService:
 
                 logger.warning("Revoked capability %s from Role %s", mapping.permission.code, mapping.role.slug)
 
-                # TODO: Trigger AuditLogService call in a later phase.
-                # AuditLogService.log_permission_revoked(
-                #     role_id=role_id,
-                #     permission_id=permission_id
-                # )
+                AuditLogService.log(
+                    event_type=AuditLog.EventType.PERMISSION_REMOVED,
+                    status=AuditLog.Status.SUCCESS,
+                    description=f"Permission {mapping.permission.code} removed from role {mapping.role.slug}.",
+                    user=actor,
+                    resource="RolePermission",
+                    resource_id=str(mapping.id),
+                    metadata={"role_slug": mapping.role.slug, "permission_code": mapping.permission.code},
+                )
 
                 return mapping
         except ValidationError as e:

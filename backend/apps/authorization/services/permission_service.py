@@ -3,6 +3,8 @@ from django.db import transaction, IntegrityError
 from django.core.exceptions import ValidationError
 from django.db.models import QuerySet
 
+from apps.audit_logs.models import AuditLog
+from apps.audit_logs.services import AuditLogService
 from apps.authorization.models import Permission
 from apps.authorization.exceptions import (
     PermissionAlreadyExistsException,
@@ -52,12 +54,11 @@ class PermissionService:
         resource: str,
         action: str,
         description: str = "",
-        is_system: bool = False
+        is_system: bool = False,
+        actor=None
     ) -> Permission:
         """
         Registers a new permission capability in the system catalog.
-        
-        Enforces unique code naming conventions and resource-action consistency.
         """
         code = f"{resource}:{action}"
         
@@ -82,13 +83,15 @@ class PermissionService:
 
                 logger.info("Successfully registered permission catalog item: %s", code)
 
-                # TODO: Trigger AuditLogService here in a later phase.
-                # AuditLogService.log_event(
-                #     event_type="authorization.permission.create",
-                #     resource=code,
-                #     status="success",
-                #     details=f"Created permission: {name} (System: {is_system})"
-                # )
+                AuditLogService.log(
+                    event_type=AuditLog.EventType.PERMISSION_CREATED,
+                    status=AuditLog.Status.SUCCESS,
+                    description=f"Permission {code} created.",
+                    user=actor,
+                    resource="Permission",
+                    resource_id=str(permission.id),
+                    metadata={"code": code, "name": name, "is_system": is_system},
+                )
 
                 return permission
                 
@@ -106,26 +109,23 @@ class PermissionService:
         *,
         name: str = None,
         description: str = None,
+        actor=None,
         **kwargs
     ) -> Permission:
         """
         Updates name and description attributes of an existing permission.
-        
-        System-defined permissions are protected from renaming or modification of their core properties.
         """
         try:
             permission = Permission.objects.get(id=permission_id)
         except Permission.DoesNotExist:
             raise PermissionNotFoundException(f"Permission catalog item with ID '{permission_id}' not found.")
 
-        # Immutability Check for system roles
         if permission.is_system:
             if name is not None and name.strip() != permission.name:
                 raise SystemPermissionModificationException(
                     f"System permission '{permission.code}' is immutable and cannot be renamed."
                 )
 
-        # Core fields (code, resource, action, is_system) are read-only
         immutable_fields = ["code", "resource", "action", "is_system"]
         for field in immutable_fields:
             if field in kwargs:
@@ -145,13 +145,15 @@ class PermissionService:
 
                 logger.info("Successfully updated permission catalog item: %s", permission.code)
 
-                # TODO: Trigger AuditLogService here in a later phase.
-                # AuditLogService.log_event(
-                #     event_type="authorization.permission.update",
-                #     resource=permission.code,
-                #     status="success",
-                #     details=f"Updated permission details"
-                # )
+                AuditLogService.log(
+                    event_type=AuditLog.EventType.PERMISSION_UPDATED,
+                    status=AuditLog.Status.SUCCESS,
+                    description=f"Permission {permission.code} updated.",
+                    user=actor,
+                    resource="Permission",
+                    resource_id=str(permission.id),
+                    metadata={"code": permission.code},
+                )
 
                 return permission
                 
@@ -160,11 +162,9 @@ class PermissionService:
             raise InvalidPermissionException(f"Invalid updates: {e.message_dict}")
 
     @classmethod
-    def deactivate_permission(cls, permission_id: str) -> Permission:
+    def deactivate_permission(cls, permission_id: str, actor=None) -> Permission:
         """
         Deactivates (soft-deletes) a permission catalog capability.
-        
-        Immutable system capabilities cannot be deactivated.
         """
         try:
             permission = Permission.objects.get(id=permission_id)
@@ -183,13 +183,15 @@ class PermissionService:
 
                 logger.warning("Soft-deactivated permission catalog item: %s", permission.code)
 
-                # TODO: Trigger AuditLogService here in a later phase.
-                # AuditLogService.log_event(
-                #     event_type="authorization.permission.deactivate",
-                #     resource=permission.code,
-                #     status="success",
-                #     details="Soft-deactivated permission capability"
-                # )
+                AuditLogService.log(
+                    event_type=AuditLog.EventType.PERMISSION_DELETED,
+                    status=AuditLog.Status.SUCCESS,
+                    description=f"Permission {permission.code} deactivated.",
+                    user=actor,
+                    resource="Permission",
+                    resource_id=str(permission.id),
+                    metadata={"code": permission.code},
+                )
 
                 return permission
                 
@@ -197,7 +199,7 @@ class PermissionService:
             raise InvalidPermissionException(f"Validation failed: {e.message_dict}")
 
     @classmethod
-    def activate_permission(cls, permission_id: str) -> Permission:
+    def activate_permission(cls, permission_id: str, actor=None) -> Permission:
         """
         Re-activates a soft-disabled permission catalog capability.
         """
@@ -213,13 +215,15 @@ class PermissionService:
 
                 logger.info("Re-activated permission catalog item: %s", permission.code)
 
-                # TODO: Trigger AuditLogService here in a later phase.
-                # AuditLogService.log_event(
-                #     event_type="authorization.permission.activate",
-                #     resource=permission.code,
-                #     status="success",
-                #     details="Re-activated permission capability"
-                # )
+                AuditLogService.log(
+                    event_type=AuditLog.EventType.PERMISSION_UPDATED,
+                    status=AuditLog.Status.SUCCESS,
+                    description=f"Permission {permission.code} activated.",
+                    user=actor,
+                    resource="Permission",
+                    resource_id=str(permission.id),
+                    metadata={"code": permission.code},
+                )
 
                 return permission
                 

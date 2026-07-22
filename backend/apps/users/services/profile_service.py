@@ -2,6 +2,8 @@ from django.db import transaction
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 
+from apps.audit_logs.models import AuditLog
+from apps.audit_logs.services import AuditLogService
 from apps.authorization.permissions import can_edit_user
 from apps.users.selectors import UserSelector
 
@@ -40,12 +42,15 @@ class UserProfileService:
                 user.full_clean()
                 user.save()
 
-                # Audit Log Extension Point:
-                # AuditLogService.log_user_updated(
-                #     actor_id=actor.id,
-                #     target_id=user.id,
-                #     changes=data
-                # )
+                AuditLogService.log(
+                    event_type=AuditLog.EventType.USER_UPDATED,
+                    status=AuditLog.Status.SUCCESS,
+                    description=f"Profile updated for user {user.email}.",
+                    user=actor,
+                    resource="User",
+                    resource_id=str(user.id),
+                    metadata={"updated_fields": list(data.keys())},
+                )
 
                 return user
         except DjangoValidationError as e:

@@ -7,6 +7,8 @@ from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.db.models import QuerySet
 
+from apps.audit_logs.models import AuditLog
+from apps.audit_logs.services import AuditLogService
 from apps.authorization.models import Role
 from apps.authorization.constants import RoleSlugs
 from apps.authorization.exceptions import RoleNotFoundException
@@ -36,14 +38,7 @@ class MembershipService:
     def get_members(cls, organization_id: uuid.UUID | str) -> QuerySet[OrganizationMembership]:
         """
         Retrieves all membership records associated with the organization, including inactive ones.
-        
-        Args:
-            organization_id: Unique UUID or string identifier of the target organization.
-            
-        Returns:
-            A Django QuerySet of OrganizationMembership records.
         """
-        # Retrieve roster via Selector layer to maintain read boundaries
         return MembershipSelector.list_organization_memberships(organization_id)
 
     @classmethod
@@ -53,29 +48,12 @@ class MembershipService:
         organization_id: uuid.UUID | str,
         user_id: uuid.UUID | str,
         role_slug: str,
-        status: str = MembershipStatus.ACTIVE
+        status: str = MembershipStatus.ACTIVE,
+        actor: Any = None,
     ) -> OrganizationMembership:
         """
         Explicitly inserts/updates a user membership, bypassing the invitation flow.
-        
-        Can reactivate previously removed/suspended memberships or map a new user identity.
-        
-        Args:
-            organization_id: UUID of the target organization.
-            user_id: UUID of the User identity to add.
-            role_slug: Slug of the role to assign.
-            status: Initial status of the membership (default ACTIVE).
-            
-        Returns:
-            The created or updated OrganizationMembership instance.
-            
-        Raises:
-            OrganizationNotFoundException: If the organization does not exist.
-            MembershipAlreadyExistsException: If the user is already an active member.
-            RoleNotFoundException: If the requested role slug is invalid.
-            ValidationError: If database or model-level validations fail.
         """
-        # Lookup organization via Selector layer
         org = OrganizationSelector.get_organization_by_id(organization_id)
 
         user_model = get_user_model()
@@ -89,7 +67,6 @@ class MembershipService:
         except Role.DoesNotExist:
             raise RoleNotFoundException(f"Role with slug '{role_slug}' not found.")
 
-        # Guard: Check for duplicate membership using selector lookup
         existing = MembershipSelector.get_user_membership(organization_id=org.id, user_id=user.id)
         if existing:
             if existing.status in [MembershipStatus.ACTIVE, MembershipStatus.PENDING]:
@@ -97,7 +74,6 @@ class MembershipService:
                     f"User '{user.id}' is already a member with status '{existing.status}'."
                 )
 
-            # Reactivate previously removed or suspended memberships cleanly
             try:
                 with transaction.atomic():
                     existing.status = status
@@ -106,8 +82,17 @@ class MembershipService:
                         existing.joined_at = timezone.now()
                     existing.full_clean()
                     existing.save()
-                    
-                    # Sanitize Logs: Use UUIDs and Slugs instead of user email
+
+                    AuditLogService.log(
+                        event_type=AuditLog.EventType.ORGANIZATION_MEMBER_ADDED,
+                        status=AuditLog.Status.SUCCESS,
+                        description=f"Member {user.email} reactivated in organization {org.slug}.",
+                        user=actor or user,
+                        resource="OrganizationMembership",
+                        resource_id=str(existing.id),
+                        metadata={"organization_id": str(org.id), "user_id": str(user.id), "role": role_slug},
+                    )
+
                     logger.info("Reactivated membership for user_id: %s in organization: %s with role: %s", user.id, org.slug, role_slug)
                     return existing
             except ValidationError as e:
@@ -124,8 +109,17 @@ class MembershipService:
                 )
                 membership.full_clean()
                 membership.save()
-                
-                # Sanitize Logs: Use UUIDs and Slugs instead of user email
+
+                AuditLogService.log(
+                    event_type=AuditLog.EventType.ORGANIZATION_MEMBER_ADDED,
+                    status=AuditLog.Status.SUCCESS,
+                    description=f"Member {user.email} added to organization {org.slug}.",
+                    user=actor or user,
+                    resource="OrganizationMembership",
+                    resource_id=str(membership.id),
+                    metadata={"organization_id": str(org.id), "user_id": str(user.id), "role": role_slug},
+                )
+
                 logger.info("Successfully added user_id: %s directly to organization: %s with role: %s", user.id, org.slug, role_slug)
                 return membership
                 
@@ -143,24 +137,7 @@ class MembershipService:
     ) -> OrganizationMembership:
         """
         Updates the role mapped to a specific membership.
-        
-        Prevents demoting the primary tenant owner below the Administrator role.
-        
-        Args:
-            membership_id: UUID of the membership record.
-            role_slug: The target role slug to map.
-            actor: The User executing the update (used for logging).
-            
-        Returns:
-            The updated OrganizationMembership instance.
-            
-        Raises:
-            MembershipNotFoundException: If the membership does not exist.
-            RoleNotFoundException: If the target role slug is invalid.
-            InvalidMembershipException: If the update attempts to demote the owner.
-            ValidationError: If model validations fail.
         """
-        # Retrieve membership record via Selector layer
         membership = MembershipSelector.get_membership_by_id(membership_id)
 
         try:
@@ -170,7 +147,6 @@ class MembershipService:
 
         org = membership.organization
 
-        # Guard: The primary owner of the organization must always retain the Administrator role.
         if org.owner == membership.user and role_slug != RoleSlugs.ADMIN:
             raise InvalidMembershipException("The organization owner must retain the Administrator role. Transfer ownership first.")
 
@@ -179,8 +155,17 @@ class MembershipService:
                 membership.role = role_obj
                 membership.full_clean()
                 membership.save()
-                
-                # Sanitize Logs: Use UUIDs and Slugs instead of user email
+
+                AuditLogService.log(
+                    event_type=AuditLog.EventType.ORGANIZATION_MEMBER_UPDATED,
+                    status=AuditLog.Status.SUCCESS,
+                    description=f"Membership role updated to {role_slug} for user {membership.user.email}.",
+                    user=actor,
+                    resource="OrganizationMembership",
+                    resource_id=str(membership.id),
+                    metadata={"organization_id": str(org.id), "user_id": str(membership.user_id), "new_role": role_slug},
+                )
+
                 logger.info("Updated role of member_id: %s to role: %s in organization: %s by actor_id: %s", membership.user_id, role_slug, org.slug, actor.id)
                 return membership
         except ValidationError as e:
@@ -197,31 +182,14 @@ class MembershipService:
     ) -> OrganizationMembership:
         """
         Suspends, activates, or modifies the status of a user membership.
-        
-        Prevents deactivation or suspension of the organization's current owner.
-        
-        Args:
-            membership_id: UUID of the membership record.
-            status: Target MembershipStatus value.
-            actor: The User executing the update (used for logging).
-            
-        Returns:
-            The updated OrganizationMembership instance.
-            
-        Raises:
-            MembershipNotFoundException: If the membership does not exist.
-            InvalidMembershipException: If the update attempts to suspend/remove the owner.
-            ValidationError: If status is invalid or model validations fail.
         """
         if status not in MembershipStatus.values:
             raise ValidationError({"status": f"Invalid membership status choice: {status}"})
 
-        # Retrieve membership record via Selector layer
         membership = MembershipSelector.get_membership_by_id(membership_id)
 
         org = membership.organization
 
-        # Guard: Deactivating the primary owner would leave the organization orphan / unmanageable.
         if org.owner == membership.user and status in [MembershipStatus.SUSPENDED, MembershipStatus.REMOVED]:
             raise InvalidMembershipException("The organization owner's membership cannot be suspended or removed. Transfer ownership first.")
 
@@ -230,8 +198,23 @@ class MembershipService:
                 membership.status = status
                 membership.full_clean()
                 membership.save()
-                
-                # Sanitize Logs: Use UUIDs instead of user email
+
+                event_type = (
+                    AuditLog.EventType.ORGANIZATION_MEMBER_REMOVED
+                    if status == MembershipStatus.REMOVED
+                    else AuditLog.EventType.ORGANIZATION_MEMBER_UPDATED
+                )
+
+                AuditLogService.log(
+                    event_type=event_type,
+                    status=AuditLog.Status.SUCCESS,
+                    description=f"Membership status updated to {status} for user {membership.user.email}.",
+                    user=actor,
+                    resource="OrganizationMembership",
+                    resource_id=str(membership.id),
+                    metadata={"organization_id": str(org.id), "user_id": str(membership.user_id), "new_status": status},
+                )
+
                 logger.info("Updated status of membership_id: %s to status: %s by actor_id: %s", membership_id, status, actor.id)
                 return membership
         except ValidationError as e:
@@ -242,10 +225,6 @@ class MembershipService:
     def remove_member(cls, *, membership_id: uuid.UUID | str, actor: Any) -> None:
         """
         Revokes a user's membership in an organization (soft-delete).
-        
-        Args:
-            membership_id: UUID of the membership record.
-            actor: The User executing the removal.
         """
         cls.update_membership_status(
             membership_id=membership_id,

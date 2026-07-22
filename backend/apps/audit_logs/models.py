@@ -51,10 +51,22 @@ class AuditLog(models.Model):
         ACCOUNT_LOCKED = "ACCOUNT_LOCKED", "Account Locked"
         ACCOUNT_UNLOCKED = "ACCOUNT_UNLOCKED", "Account Unlocked"
 
+        # ── Users ──────────────────────────────────────────────────────────────
+        USER_ACTIVATED = "USER_ACTIVATED", "User Activated"
+        USER_DEACTIVATED = "USER_DEACTIVATED", "User Deactivated"
+        USER_UPDATED = "USER_UPDATED", "User Profile Updated"
+
         # ── Organizations ──────────────────────────────────────────────────────
         ORGANIZATION_CREATED = "ORGANIZATION_CREATED", "Organization Created"
         ORGANIZATION_UPDATED = "ORGANIZATION_UPDATED", "Organization Updated"
         ORGANIZATION_DELETED = "ORGANIZATION_DELETED", "Organization Deleted"
+        ORGANIZATION_MEMBER_ADDED = "ORGANIZATION_MEMBER_ADDED", "Organization Member Added"
+        ORGANIZATION_MEMBER_REMOVED = "ORGANIZATION_MEMBER_REMOVED", "Organization Member Removed"
+        ORGANIZATION_MEMBER_UPDATED = "ORGANIZATION_MEMBER_UPDATED", "Organization Member Role Updated"
+        ORGANIZATION_INVITATION_SENT = "ORGANIZATION_INVITATION_SENT", "Organization Invitation Sent"
+        ORGANIZATION_INVITATION_ACCEPTED = "ORGANIZATION_INVITATION_ACCEPTED", "Organization Invitation Accepted"
+        ORGANIZATION_INVITATION_REVOKED = "ORGANIZATION_INVITATION_REVOKED", "Organization Invitation Revoked"
+        ORGANIZATION_OWNERSHIP_TRANSFERRED = "ORGANIZATION_OWNERSHIP_TRANSFERRED", "Organization Ownership Transferred"
 
         # ── Roles ──────────────────────────────────────────────────────────────
         ROLE_CREATED = "ROLE_CREATED", "Role Created"

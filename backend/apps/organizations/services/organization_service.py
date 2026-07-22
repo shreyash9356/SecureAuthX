@@ -6,6 +6,8 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.utils.text import slugify
 
+from apps.audit_logs.models import AuditLog
+from apps.audit_logs.services import AuditLogService
 from apps.authorization.models import Role
 from apps.authorization.constants import RoleSlugs
 from apps.authorization.exceptions import RoleNotFoundException
@@ -66,24 +68,6 @@ class OrganizationService:
     ) -> Organization:
         """
         Registers a new organization tenant, bootstraps settings, and maps the owner membership.
-        
-        Performs case-insensitive validation against duplicate organization names, resolves/creates
-        a unique slug identifier, and runs all operations inside a transactional block.
-        
-        Args:
-            name: Human-readable organization name.
-            owner: User model instance establishing the tenant.
-            slug: Optional predefined slug. If omitted, one is generated from the name.
-            description: Optional details summary.
-            settings_data: Settings parameters (e.g. timezone) to override defaults.
-            
-        Returns:
-            The created Organization model instance.
-            
-        Raises:
-            OrganizationAlreadyExistsException: If the name or slug is in use.
-            RoleNotFoundException: If the Administrator role does not exist in the database.
-            ValidationError: If model constraints fail.
         """
         # Guard: Validate duplicate names case-insensitively
         if Organization.objects.filter(name__iexact=name).exists():
@@ -145,7 +129,16 @@ class OrganizationService:
                 membership.full_clean()
                 membership.save()
 
-                # Sanitize Logs: Use UUID instead of user email
+                AuditLogService.log(
+                    event_type=AuditLog.EventType.ORGANIZATION_CREATED,
+                    status=AuditLog.Status.SUCCESS,
+                    description=f"Organization {org.name} created.",
+                    user=owner,
+                    resource="Organization",
+                    resource_id=str(org.id),
+                    metadata={"slug": org.slug, "owner_id": str(owner.id)},
+                )
+
                 logger.info("Successfully created Organization: %s (Slug: %s, Owner_id: %s)", org.name, org.slug, owner.id)
                 return org
 
@@ -163,31 +156,17 @@ class OrganizationService:
         *,
         name: Optional[str] = None,
         description: Optional[str] = None,
-        status: Optional[str] = None
+        status: Optional[str] = None,
+        actor: Any = None,
     ) -> Organization:
         """
         Updates organization parameters and status.
-        
-        Args:
-            organization_id: UUID of the organization.
-            name: New display name.
-            description: New description summary.
-            status: New lifecycle status choice.
-            
-        Returns:
-            The updated Organization model instance.
-            
-        Raises:
-            OrganizationNotFoundException: If the organization does not exist.
-            ValidationError: If model validations or choices fail.
         """
-        # Lookup organization via Selector layer
         org = OrganizationSelector.get_organization_by_id(organization_id)
 
         try:
             with transaction.atomic():
                 if name is not None:
-                    # Enforce case-insensitive validation for names during rename
                     name_stripped = name.strip()
                     if Organization.objects.exclude(id=org.id).filter(name__iexact=name_stripped).exists():
                         raise OrganizationAlreadyExistsException(f"Organization with name '{name_stripped}' already exists.")
@@ -201,6 +180,17 @@ class OrganizationService:
 
                 org.full_clean()
                 org.save()
+
+                AuditLogService.log(
+                    event_type=AuditLog.EventType.ORGANIZATION_UPDATED,
+                    status=AuditLog.Status.SUCCESS,
+                    description=f"Organization {org.name} updated.",
+                    user=actor or org.owner,
+                    resource="Organization",
+                    resource_id=str(org.id),
+                    metadata={"slug": org.slug},
+                )
+
                 logger.info("Successfully updated Organization: %s (ID: %s)", org.name, org.id)
                 return org
         except ValidationError as e:
@@ -208,17 +198,10 @@ class OrganizationService:
             raise ValidationError(e.message_dict)
 
     @classmethod
-    def delete_organization(cls, organization_id: uuid.UUID | str) -> None:
+    def delete_organization(cls, organization_id: uuid.UUID | str, actor: Any = None) -> None:
         """
         Soft-deletes the organization tenant and its member roster.
-        
-        Args:
-            organization_id: UUID of the organization to delete.
-            
-        Raises:
-            OrganizationNotFoundException: If the organization does not exist.
         """
-        # Lookup organization via Selector layer
         org = OrganizationSelector.get_organization_by_id(organization_id)
 
         try:
@@ -226,11 +209,21 @@ class OrganizationService:
                 org.status = OrganizationStatus.DELETED
                 org.save()
 
-                # Revoke membership access for all members
                 org.memberships.filter(status=MembershipStatus.ACTIVE).update(
                     status=MembershipStatus.REMOVED,
                     updated_at=timezone.now()
                 )
+
+                AuditLogService.log(
+                    event_type=AuditLog.EventType.ORGANIZATION_DELETED,
+                    status=AuditLog.Status.SUCCESS,
+                    description=f"Organization {org.name} deleted.",
+                    user=actor or org.owner,
+                    resource="Organization",
+                    resource_id=str(org.id),
+                    metadata={"slug": org.slug},
+                )
+
                 logger.info("Successfully soft-deleted Organization: %s.", org.id)
         except Exception as e:
             logger.error("Failed to soft-delete organization %s: %s", organization_id, str(e))

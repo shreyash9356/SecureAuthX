@@ -2,6 +2,8 @@ import logging
 from django.db import transaction
 from rest_framework.exceptions import NotFound
 
+from apps.audit_logs.models import AuditLog
+from apps.audit_logs.services import AuditLogService
 from apps.organizations.constants import OrganizationStatus
 from apps.users.exceptions import SelfOperationException, OwnerDeactivationException
 from apps.users.selectors import UserSelector
@@ -27,8 +29,15 @@ class UserStatusService:
             user.is_active = True
             user.save()
 
-            # Audit Log Extension Point:
-            # AuditLogService.log_user_activated(actor_id=actor.id, target_id=user.id)
+            AuditLogService.log(
+                event_type=AuditLog.EventType.USER_ACTIVATED,
+                status=AuditLog.Status.SUCCESS,
+                description=f"User account {user.email} activated.",
+                user=actor,
+                resource="User",
+                resource_id=str(user.id),
+                metadata={"target_user_email": user.email},
+            )
             logger.info("User %s activated by actor %s", user.email, actor.email)
 
     @staticmethod
@@ -54,8 +63,15 @@ class UserStatusService:
             user.is_active = False
             user.save()
 
-            # Audit Log Extension Point:
-            # AuditLogService.log_user_deactivated(actor_id=actor.id, target_id=user.id)
+            AuditLogService.log(
+                event_type=AuditLog.EventType.USER_DEACTIVATED,
+                status=AuditLog.Status.SUCCESS,
+                description=f"User account {user.email} deactivated.",
+                user=actor,
+                resource="User",
+                resource_id=str(user.id),
+                metadata={"target_user_email": user.email},
+            )
             logger.warning("User %s deactivated by actor %s", user.email, actor.email)
 
     @staticmethod
@@ -76,8 +92,18 @@ class UserStatusService:
             user.locked_until = locked_until
             user.save()
 
-            # Audit Log Extension Point:
-            # AuditLogService.log_user_locked(actor_id=actor.id, target_id=user.id, locked_until=locked_until)
+            AuditLogService.log(
+                event_type=AuditLog.EventType.ACCOUNT_LOCKED,
+                status=AuditLog.Status.SUCCESS,
+                description=f"User account {user.email} locked until {locked_until}.",
+                user=actor,
+                resource="User",
+                resource_id=str(user.id),
+                metadata={
+                    "target_user_email": user.email,
+                    "locked_until": str(locked_until) if locked_until else None,
+                },
+            )
             logger.warning("User %s locked by actor %s until %s", user.email, actor.email, locked_until)
 
     @staticmethod
@@ -95,6 +121,13 @@ class UserStatusService:
             user.failed_login_attempts = 0
             user.save()
 
-            # Audit Log Extension Point:
-            # AuditLogService.log_user_unlocked(actor_id=actor.id, target_id=user.id)
+            AuditLogService.log(
+                event_type=AuditLog.EventType.ACCOUNT_UNLOCKED,
+                status=AuditLog.Status.SUCCESS,
+                description=f"User account {user.email} unlocked.",
+                user=actor,
+                resource="User",
+                resource_id=str(user.id),
+                metadata={"target_user_email": user.email},
+            )
             logger.info("User %s unlocked by actor %s", user.email, actor.email)

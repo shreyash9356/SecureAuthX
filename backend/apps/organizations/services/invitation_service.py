@@ -6,6 +6,8 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 
+from apps.audit_logs.models import AuditLog
+from apps.audit_logs.services import AuditLogService
 from apps.authorization.models import Role
 from apps.authorization.constants import RoleSlugs
 from apps.authorization.exceptions import RoleNotFoundException
@@ -69,29 +71,7 @@ class InvitationService:
     ) -> OrganizationInvitation:
         """
         Generates and registers an invitation record for a prospective user by email address.
-        
-        Runs inside an atomic transaction block. Invalidates previously pending tokens for this
-        email within the target organization to limit replay vectors. If the user account
-        already exists in the system database, we pre-register their organization membership
-        in PENDING status.
-        
-        Args:
-            organization_id: UUID of the target organization.
-            email: Target email address.
-            invited_by: User model instance issuing the invitation.
-            role_slug: Slug of the role the user will receive upon acceptance.
-            expires_in_days: Lifetime duration (TTL) of the invitation link.
-            
-        Returns:
-            The created OrganizationInvitation instance.
-            
-        Raises:
-            OrganizationNotFoundException: If the organization does not exist.
-            MembershipAlreadyExistsException: If the user is already a member.
-            RoleNotFoundException: If the role slug cannot be resolved.
-            ValidationError: If email formats or database constraints fail.
         """
-        # Lookup organization via Selector layer
         org = OrganizationSelector.get_organization_by_id(organization_id)
 
         try:
@@ -99,7 +79,6 @@ class InvitationService:
         except Role.DoesNotExist:
             raise RoleNotFoundException(f"Role with slug '{role_slug}' not found.")
 
-        # Guard: Stop processing if the user already holds active or pending membership
         user_model = get_user_model()
         user_opt = user_model.objects.filter(email=email).first()
         if user_opt:
@@ -113,7 +92,6 @@ class InvitationService:
 
         try:
             with transaction.atomic():
-                # Administrative Revocation of previous pending invitations via selector filter
                 InvitationSelector.list_pending_invitations(org.id).filter(email=email).update(
                     status=InvitationStatus.CANCELLED
                 )
@@ -129,7 +107,6 @@ class InvitationService:
                 invitation.full_clean()
                 invitation.save()
 
-                # If the user already has a system identity, register a placeholder membership
                 if user_opt:
                     membership, _ = OrganizationMembership.objects.update_or_create(
                         organization=org,
@@ -144,7 +121,16 @@ class InvitationService:
                     membership.full_clean()
                     membership.save()
 
-                # Sanitize Logs: Mask email PII and use organization slug
+                AuditLogService.log(
+                    event_type=AuditLog.EventType.ORGANIZATION_INVITATION_SENT,
+                    status=AuditLog.Status.SUCCESS,
+                    description=f"Invitation sent to {email} for organization {org.slug}.",
+                    user=invited_by,
+                    resource="OrganizationInvitation",
+                    resource_id=str(invitation.id),
+                    metadata={"organization_id": str(org.id), "role": role_slug},
+                )
+
                 logger.info("Sent invitation_id: %s to %s for organization: %s (Role: %s)", invitation.id, _mask_email(email), org.slug, role_slug)
                 return invitation
                 
@@ -156,41 +142,20 @@ class InvitationService:
     def accept_invitation(cls, *, token: uuid.UUID | str, user: Any) -> OrganizationMembership:
         """
         Validates and accepts a pending organization invitation token.
-        
-        Enforces security controls including expiration times and email identity verification
-        before changing membership status.
-        
-        Args:
-            token: The unique UUID invitation token.
-            user: The authenticated User accepting the invitation.
-            
-        Returns:
-            The activated OrganizationMembership model.
-            
-        Raises:
-            InvitationNotFoundException: If the token is invalid.
-            InvitationExpiredException: If the token has expired.
-            InvitationAlreadyAcceptedException: If the invitation was already accepted.
-            InvalidInvitationStateException: If the invitation is cancelled or rejected.
-            ValidationError: If email constraints fail.
         """
-        # Fetch invitation record via Selector layer
         invitation = InvitationSelector.get_invitation_by_token(token)
 
-        # Guard: Check token lifetime freshness
         if invitation.expires_at <= timezone.now():
             if invitation.status == InvitationStatus.PENDING:
                 invitation.status = InvitationStatus.EXPIRED
                 invitation.save()
             raise InvitationExpiredException("This invitation has expired.")
 
-        # Guard: Prevent double-spend / reuse of accepted tokens
         if invitation.status == InvitationStatus.ACCEPTED:
             raise InvitationAlreadyAcceptedException("This invitation has already been accepted.")
         elif invitation.status != InvitationStatus.PENDING:
             raise InvalidInvitationStateException(f"Invitation cannot be accepted in its current state: '{invitation.status}'.")
 
-        # Security Guard: Prevent session hijacking (User B accepting User A's token)
         if invitation.email.lower() != user.email.lower():
             raise ValidationError({"email": "This invitation was issued to a different email address."})
 
@@ -200,21 +165,18 @@ class InvitationService:
                 invitation.accepted_at = timezone.now()
                 invitation.save()
 
-                # Find or instantiate the membership using Selector layer
                 membership = MembershipSelector.get_user_membership(
                     organization_id=invitation.organization_id,
                     user_id=user.id
                 )
 
                 if membership:
-                    # Transition pending status to active
                     membership.status = MembershipStatus.ACTIVE
                     membership.joined_at = timezone.now()
                     membership.invited_by = invitation.invited_by
                     membership.full_clean()
                     membership.save()
                 else:
-                    # User registered post-invite generation: create initial membership mapping
                     try:
                         role_obj = Role.objects.get(slug=RoleSlugs.EMPLOYEE)
                     except Role.DoesNotExist:
@@ -231,7 +193,16 @@ class InvitationService:
                     membership.full_clean()
                     membership.save()
 
-                # Sanitize Logs: Use UUIDs and Slugs instead of user emails
+                AuditLogService.log(
+                    event_type=AuditLog.EventType.ORGANIZATION_INVITATION_ACCEPTED,
+                    status=AuditLog.Status.SUCCESS,
+                    description=f"User {user.email} accepted invitation for organization {invitation.organization.slug}.",
+                    user=user,
+                    resource="OrganizationInvitation",
+                    resource_id=str(invitation.id),
+                    metadata={"organization_id": str(invitation.organization_id)},
+                )
+
                 logger.info("User_id: %s successfully accepted invitation_id: %s for organization: %s", user.id, invitation.id, invitation.organization.slug)
                 return membership
                 
@@ -243,18 +214,7 @@ class InvitationService:
     def reject_invitation(cls, *, token: uuid.UUID | str) -> OrganizationInvitation:
         """
         Rejects a pending invitation, rendering the token permanently unusable.
-        
-        Args:
-            token: Unique UUID invitation token.
-            
-        Returns:
-            The updated OrganizationInvitation instance.
-            
-        Raises:
-            InvitationNotFoundException: If the token does not exist.
-            InvalidInvitationStateException: If the invitation is not pending.
         """
-        # Fetch invitation record via Selector layer
         invitation = InvitationSelector.get_invitation_by_token(token)
 
         if invitation.status != InvitationStatus.PENDING:
@@ -270,19 +230,7 @@ class InvitationService:
     def cancel_invitation(cls, *, invitation_id: uuid.UUID | str, actor: Any) -> OrganizationInvitation:
         """
         Cancels a pending invitation administratively, preventing future acceptance.
-        
-        Args:
-            invitation_id: UUID of the target invitation record.
-            actor: User executing the cancellation.
-            
-        Returns:
-            The updated OrganizationInvitation instance.
-            
-        Raises:
-            InvitationNotFoundException: If the invitation does not exist.
-            InvalidInvitationStateException: If the invitation is not pending.
         """
-        # Fetch invitation record via Selector layer
         invitation = InvitationSelector.get_invitation_by_id(invitation_id)
 
         if invitation.status != InvitationStatus.PENDING:
@@ -290,7 +238,16 @@ class InvitationService:
 
         invitation.status = InvitationStatus.CANCELLED
         invitation.save()
-        
-        # Sanitize Logs: Use UUID instead of user email
+
+        AuditLogService.log(
+            event_type=AuditLog.EventType.ORGANIZATION_INVITATION_REVOKED,
+            status=AuditLog.Status.SUCCESS,
+            description=f"Invitation {invitation.id} cancelled.",
+            user=actor,
+            resource="OrganizationInvitation",
+            resource_id=str(invitation.id),
+            metadata={"organization_id": str(invitation.organization_id)},
+        )
+
         logger.info("Invitation %s was cancelled by actor_id: %s", invitation_id, actor.id)
         return invitation
