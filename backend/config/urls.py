@@ -48,6 +48,11 @@ urlpatterns = [
         "api/v1/mfa/",
         include("apps.mfa.api.urls"),
     ),
+    # Notifications API
+    path(
+        "api/v1/notifications/",
+        include("apps.notifications.api.urls"),
+    ),
     # OpenAPI schema (machine-readable)
     path(
         "api/schema/",

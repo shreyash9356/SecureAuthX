@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>New Device Sign-In - SecureAuthX</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; background: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .header { text-align: center; padding-bottom: 20px; border-bottom: 1px solid #e1e8ed; }
+        .header h1 { color: #1a202c; font-size: 24px; margin: 0; }
+        .content { padding: 20px 0; line-height: 1.6; }
+        .info-box { background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 15px; margin: 15px 0; }
+        .footer { text-align: center; font-size: 12px; color: #718096; margin-top: 30px; border-top: 1px solid #e1e8ed; padding-top: 15px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>SecureAuthX Security Alert</h1>
+        </div>
+        <div class="content">
+            <h2>New Device Detected</h2>
+            <p>Hello {% if first_name %}{{ first_name }}{% else %}User{% endif %},</p>
+            <p>Your SecureAuthX account was accessed from a device we haven't seen before.</p>
+            <div class="info-box">
+                <p><strong>Device:</strong> {{ device }}</p>
+                <p><strong>IP Address:</strong> {{ ip_address }}</p>
+                {% if location %}<p><strong>Location:</strong> {{ location }}</p>{% endif %}
+            </div>
+            <p>If you signed in on this new device, you can ignore this email. If you do not recognize this activity, please terminate active sessions immediately.</p>
+        </div>
+        <div class="footer">
+            <p>&copy; 2026 SecureAuthX Enterprise IAM. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>
